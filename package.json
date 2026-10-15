@@ -1,0 +1,37 @@
+{
+  "name": "opencode-theme-manager",
+  "version": "0.1.0",
+  "description": "Prompt- or image-driven theme manager for opencode: V2 themes, transparency, fonts, layout, CSS. Zero dependencies.",
+  "type": "module",
+  "bin": {
+    "opencode-theme-manager": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/",
+    "check": "node tools/check.mjs",
+    "smoke": "node tools/serve-smoke.mjs",
+    "apply": "node tools/apply.mjs",
+    "examples": "node tools/make-examples.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "lib",
+    "ui",
+    "presets",
+    "examples",
+    "tools",
+    "docs",
+    "start.cmd",
+    "install.ps1",
+    "uninstall.ps1",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["opencode", "theme", "tui", "glassmorphism", "terminal", "transparency"],
+  "license": "MIT",
+  "private": false
+}

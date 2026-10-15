@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenCode Theme Manager</title>
+<link rel="stylesheet" href="/ui/styles.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span> OpenCode Theme Manager</div>
+    <div class="paths" id="paths">loading config...</div>
+    <div class="topbar-actions">
+      <input id="themeName" class="name-input" value="glass" spellcheck="false" aria-label="theme name" />
+      <button id="btnSave" class="btn">Save theme</button>
+      <button id="btnApply" class="btn btn-accent">Apply to opencode</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="rail" id="rail">
+      <details class="panel" open>
+        <summary>1 · Describe it</summary>
+        <div class="panel-body">
+          <label class="field">
+            <span>Prompt or reference</span>
+            <textarea id="prompt" rows="4" placeholder="e.g. nord blue frosted glass, big rounded buttons, jetbrains mono, 60% transparent"></textarea>
+          </label>
+          <div class="row">
+            <label class="field grow">
+              <span>Preset palette</span>
+              <select id="preset"><option value="">(none)</option></select>
+            </label>
+            <label class="field">
+              <span>Mode</span>
+              <select id="mode">
+                <option value="dark">dark</option>
+                <option value="light">light</option>
+              </select>
+            </label>
+          </div>
+          <label class="field">
+            <span>Reference image (drag &amp; drop or pick)</span>
+            <input id="image" type="file" accept="image/*" />
+          </label>
+          <div id="imageInfo" class="hint"></div>
+          <div class="palette-preview" id="imageSwatches"></div>
+          <label class="field">
+            <span>Transparency <output id="transparencyOut">45%</output></span>
+            <input id="transparency" type="range" min="0" max="100" value="45" />
+          </label>
+          <div class="row">
+            <button id="btnGenerate" class="btn btn-accent grow">Make it look like this</button>
+            <button id="btnReset" class="btn">Reset</button>
+          </div>
+          <div class="hint" id="matched"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>2 · Palette (hue ladders)</summary>
+        <div class="panel-body">
+          <div class="hint">One colour per hue; the 9 steps are generated. Both modes are generated from the same prompt.</div>
+          <div class="hues" id="hues"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>3 · Tokens</summary>
+        <div class="panel-body">
+          <div class="row">
+            <input id="tokenFilter" class="grow" placeholder="filter tokens (text, diff, syntax...)" />
+            <label class="check"><input id="tokenOnlyOverrides" type="checkbox" /> overrides only</label>
+          </div>
+          <div class="tokens" id="tokens"></div>
+          <div class="hint" id="validation"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>4 · Transparency &amp; material</summary>
+        <div class="panel-body">
+          <label class="field">
+            <span>Dark surfaces <output id="darkTransOut">45%</output></span>
+            <input id="darkTrans" type="range" min="0" max="100" value="45" />
+          </label>
+          <label class="field">
+            <span>Light surfaces <output id="lightTransOut">25%</output></span>
+            <input id="lightTrans" type="range" min="0" max="100" value="25" />
+          </label>
+          <label class="field">
+            <span>Preview blur <output id="blurOut">18px</output></span>
+            <input id="blur" type="range" min="0" max="40" value="18" />
+          </label>
+          <div class="hint">See-through comes from the terminal compositor and the desktop window; the theme only supplies alpha. Windows Terminal writes below are the real thing.</div>
+          <div class="row">
+            <label class="field grow">
+              <span>Windows Terminal profile</span>
+              <select id="wtProfile"></select>
+            </label>
+            <label class="field">
+              <span>Opacity</span>
+              <input id="wtOpacity" type="number" min="0" max="100" value="70" />
+            </label>
+            <label class="check"><input id="wtAcrylic" type="checkbox" /> acrylic</label>
+          </div>
+          <button id="btnTerminal" class="btn">Write terminal transparency</button>
+          <div class="hint" id="terminalInfo"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>5 · Fonts, sizes, buttons</summary>
+        <div class="panel-body">
+          <div class="row">
+            <label class="field grow">
+              <span>Terminal font face</span>
+              <input id="monoFont" list="fontList" placeholder="JetBrains Mono" />
+              <datalist id="fontList"></datalist>
+            </label>
+            <label class="field">
+              <span>Font size</span>
+              <input id="fontSize" type="number" min="8" max="28" value="13" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Line height</span>
+              <input id="lineHeight" type="number" min="0.9" max="2.4" step="0.05" value="1.45" />
+            </label>
+            <label class="field">
+              <span>Corner radius</span>
+              <input id="radius" type="number" min="0" max="40" value="10" />
+            </label>
+            <label class="field">
+              <span>Padding</span>
+              <input id="pad" type="number" min="0" max="40" value="12" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Button size</span>
+              <input id="buttonSize" type="number" min="20" max="60" value="30" />
+            </label>
+            <label class="field">
+              <span>Button position</span>
+              <select id="buttonAlign"><option value="right">right</option><option value="left">left</option><option value="center">center</option></select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Sidebar width</span>
+              <input id="sidebarWidth" type="number" min="120" max="420" value="240" />
+            </label>
+            <label class="field">
+              <span>Header height</span>
+              <input id="headerHeight" type="number" min="20" max="80" value="34" />
+            </label>
+            <label class="field">
+              <span>Status height</span>
+              <input id="statusHeight" type="number" min="16" max="60" value="24" />
+            </label>
+          </div>
+          <button id="btnTerminalFont" class="btn">Write terminal font</button>
+          <div class="hint">opencode's TUI has no font or geometry settings of its own: these apply to your terminal profile and to the preview. The generated <code>preview.css</code> carries them for the desktop/web surface.</div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>6 · Layout &amp; tabs (cli.json)</summary>
+        <div class="panel-body">
+          <div class="hint">These are real opencode CLI settings, written to cli.json with a backup.</div>
+          <div class="row">
+            <label class="field grow"><span>Sidebar</span>
+              <select data-cli="session.sidebar"><option>auto</option><option>hide</option></select>
+            </label>
+            <label class="field grow"><span>Scrollbar</span>
+              <select data-cli="session.scrollbar"><option value="true">true</option><option value="false">false</option></select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field grow"><span>Tabs mode</span>
+              <select data-cli="tabs.mode"><option>auto</option><option>on</option><option>off</option></select>
+            </label>
+            <label class="field grow"><span>Tabs layout</span>
+              <select data-cli="tabs.layout"><option>horizontal</option><option>vertical</option></select>
+            </label>
+            <label class="field grow"><span>Tab indicators</span>
+              <select data-cli="tabs.indicators"><option>status</option><option>numbers</option></select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field grow"><span>Diff view</span>
+              <select data-cli="diffs.view"><option>auto</option><option>split</option><option>unified</option></select>
+            </label>
+            <label class="field grow"><span>Diff tree</span>
+              <select data-cli="diffs.tree"><option value="true">true</option><option value="false">false</option></select>
+            </label>
+            <label class="field grow"><span>Cursor</span>
+              <select data-cli="cursor.style"><option>block</option><option>underline</option><option>line</option><option>default</option></select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="check"><input type="checkbox" data-cli="animations" /> animations</label>
+            <label class="check"><input type="checkbox" data-cli="mouse" /> mouse capture</label>
+            <label class="check"><input type="checkbox" data-cli="session.thinking" data-on="show" data-off="hide" /> show reasoning</label>
+          </div>
+          <button id="btnLayout" class="btn">Write cli.json layout</button>
+          <div class="hint" id="layoutInfo"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>7 · CSS</summary>
+        <div class="panel-body">
+          <textarea id="customCss" rows="7" spellcheck="false" placeholder=".tui-sidebar { letter-spacing: .2px }&#10;.tui-prompt { box-shadow: 0 12px 40px #0006 }"></textarea>
+          <div class="row">
+            <button id="btnCss" class="btn grow">Apply CSS to preview</button>
+            <button id="btnCssExport" class="btn">Export preview.css</button>
+            <button id="btnCssSnippet" class="btn">Copy web/desktop snippet</button>
+            <button id="btnDesktopCss" class="btn">Write desktop CSS</button>
+          </div>
+          <div class="hint" id="cssInfo">Applied live to the preview below. opencode's TUI renders in your terminal and has no CSS hook, so <code>preview.css</code> is for browser/desktop surfaces + your own records. The snippet seeds the web/desktop client's <code>localStorage</code> keys that <code>/oc-theme-preload.js</code> reads on startup - paste it in that client's console once.</div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>8 · Files</summary>
+        <div class="panel-body">
+          <div class="row">
+            <label class="field grow"><span>Load saved theme</span><select id="savedThemes"></select></label>
+            <button id="btnLoad" class="btn">Load</button>
+          </div>
+          <div class="row">
+            <label class="field grow"><span>Import JSON / legacy V1</span><input id="importFile" type="file" accept=".json,application/json" /></label>
+            <button id="btnExport" class="btn">Export JSON</button>
+          </div>
+          <div class="hint" id="fileInfo"></div>
+        </div>
+      </details>
+    </section>
+
+    <section class="stage">
+      <div class="stage-bar">
+        <div class="views">
+          <button class="tab active" data-view="tui">CLI / TUI</button>
+          <button class="tab" data-view="desktop">Desktop</button>
+        </div>
+        <div class="views">
+          <button class="tab active" data-mode="dark">dark</button>
+          <button class="tab" data-mode="light">light</button>
+        </div>
+      </div>
+
+      <div class="wallpaper" id="wallpaper">
+        <div class="tui" id="tui">
+          <div class="tui-tabs" id="tuiTabs"><span class="tab-item active">glass</span><span class="tab-item">nord-bluish</span><span class="tab-plus">+</span></div>
+          <div class="tui-header" id="tuiHeader">
+            <span class="hdr-title">opencode</span>
+            <span class="hdr-meta" id="hdrMeta">build</span>
+          </div>
+          <div class="tui-body">
+            <aside class="tui-sidebar" id="tuiSidebar">
+              <div class="side-group">Sessions</div>
+              <div class="side-item active">glass theme</div>
+              <div class="side-item">diff review</div>
+              <div class="side-item">install notes</div>
+              <div class="side-group">Files</div>
+              <div class="side-item">ui/styles.css</div>
+            </aside>
+            <main class="tui-main" id="tuiMain">
+              <div class="msg user"><span class="role">you</span><div class="bubble">make opencode look like the screenshot: glass panels over the wallpaper</div></div>
+              <div class="msg assistant"><span class="role">opencode</span>
+                <div class="bubble">Baking alpha into every surface and writing the theme.</div>
+                <div class="thinking">thinking · reasoning hidden</div>
+                <div class="tool"><div class="tool-head">Edit <b>themes/glass.json</b></div><div class="tool-body mono">+ "background": { "base": "#131b288c" }</div></div>
+                <div class="diff">
+                  <div class="diff-line add">+ border: 1px solid #ffffff26</div>
+                  <div class="diff-line del">- border: none</div>
+                  <div class="diff-line ctx">  radius: 14px</div>
+                </div>
+                <pre class="code mono"><span class="c-key">const</span> <span class="c-var">glass</span> = <span class="c-fn">buildTheme</span>(<span class="c-str">"nord blue"</span>)</pre>
+              </div>
+              <div class="status-inline mono">theme written · 91 tokens resolved · 1.4s</div>
+            </main>
+          </div>
+          <div class="tui-prompt" id="tuiPrompt">
+            <span class="prompt-caret">&gt;</span>
+            <span class="prompt-text">describe a style, or drop a reference image</span>
+            <span class="btns" id="promptButtons"><span class="chip">opus</span><span class="chip accent">send</span></span>
+          </div>
+          <div class="tui-status" id="tuiStatus"><span>ready</span><span class="grow"></span><span id="statusRight">12.4 tps · 8% ctx</span></div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="sw" id="swBg"></span> background</div>
+        <div class="legend-item"><span class="sw" id="swPanel"></span> raised</div>
+        <div class="legend-item"><span class="sw" id="swAccent"></span> accent</div>
+        <div class="legend-item"><span class="sw" id="swText"></span> text</div>
+        <div class="legend-item"><span class="sw" id="swBorder"></span> border</div>
+        <div class="legend-item" id="legendInfo"></div>
+      </div>
+      <div class="status" id="status">ready</div>
+    </section>
+  </main>
+</div>
+<script type="module" src="/ui/app.js"></script>
+</body>
+</html>
