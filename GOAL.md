@@ -39,4 +39,33 @@ checks:
 - The generated theme is validated against opencode's mirrored schema and by tests, never by asserting TUI pixels: there is no headless way to read the rendered colours of the TUI, so "opencode renders it" is inferred from the schema match plus the fact that the same V2 format is what `packages/theme` consumes.
 - Writes inside `test/server.test.mjs` and `tools/serve-smoke.mjs` go to a throwaway directory or are read-only against the real config (`serve-smoke` performs GETs and pure POSTs only).
 
+## Follow-up goal (after first handover): make it visible, installable, published
+
+objective: "how do i use it? opencode doesnt change" + "put it on github, easy to install and uninstall, set up my first theme"
+acceptance:
+- B1 The glass theme is actually applied to the real config (theme file written, cli.json pointed at it) and the applied file validates.
+- B2 `node tools/apply.mjs --prompt "..." --terminal` performs save + apply + terminal transparency in one command, with backups.
+- B3 `install.ps1` installs to a target dir, writes a launcher, and the installed copy serves the API; `uninstall.ps1` removes it and leaves themes/cli.json alone.
+- B4 README answers "how do i use it" (UI steps + one-command CLI) and carries a troubleshooting checklist for "opencode looks the same".
+- B5 The project is public on GitHub under the user's account, MIT, no secrets.
+- B6 v2.0.29 really contains the V2 theme loader (not just the docs claiming it) - proven from the shipped binary.
+checks:
+- node tools/apply.mjs --name glass --mode dark --prompt "nord blue frosted glass, rounded corners, 45% transparency" --terminal
+- node tools/check.mjs "$env:USERPROFILE\.config\opencode\themes\glass.json"
+- node tools/strings-probe.mjs
+- powershell -File .\install.ps1 -TargetDir <temp> -NoShortcut  +  powershell -File .\uninstall.ps1 -TargetDir <temp> -Yes
+- gh repo view vit-cerny/opencode-theme-manager
+
+| Criterion | Evidence |
+|---|---|
+| B1 | `wrote C:\Users\witek\.config\opencode\themes\glass.json` (backup `glass.json.bak.20261015-222223`) and `applied ...\cli.json -> theme.name="glass", theme.mode="dark"` (backup `cli.json.bak.20261015-222223`); `node tools/check.mjs <that file>` -> `V2, valid` |
+| B2 | same run: `terminal ...settings.json -> opacity 70, acrylic true` (backup `settings.json.bak.20261015-222223`) |
+| B3 | install to `%TEMP%\octm-install-test` copied all 12 items, the installed `server.mjs` answered `GET /api/state` with `tokenCount 103` on port 4291; `uninstall.ps1` removed the folder (`Test-Path` -> False) and printed that themes/cli.json are untouched |
+| B4 | README sections "Using it", "I applied it but opencode looks the same" (7 checks), "Undo", "Scale notes" |
+| B5 | `gh repo create opencode-theme-manager --public --push` -> https://github.com/vit-cerny/opencode-theme-manager, commit 3739523, MIT LICENSE, no credentials in the tree |
+| B6 | `node tools/strings-probe.mjs` on the installed 203 MB binary: `FOUND "Missing required semantic hues"` (the V2 hue filter), `FOUND "opencode.ai/theme.json"`, `FOUND "byToken"/"byHue"` + `$hovered/$focused/...` state keys, `FOUND "thinkingOpacity"` (V1 migration path), `FOUND "oc-theme-preload"` (the web CSS hook) - so both V1 and V2 loaders ship in v2.0.29 |
+
+Note: `docs/screenshot.jpg` was captured against the real config, so it shows the user's username and theme list; replace it before promoting the repo widely if that matters.
+
 status: done
+
