@@ -27,7 +27,8 @@ const name = arg("--name", "glass");
 const mode = arg("--mode", "dark") === "light" ? "light" : "dark";
 const file = arg("--file");
 const configFlag = arg("--config-dir");
-const withTerminal = has("--terminal");
+const withTerminal = has("--terminal") || has("--everywhere");
+const everywhere = has("--everywhere");
 const transparency = arg("--transparency");
 
 let theme;
@@ -83,6 +84,12 @@ try {
     const terminal = await post("/api/terminal", { opacity: Number(arg("--opacity", 70)), useAcrylic: true, font });
     if (terminal.ok) console.log(`terminal  ${terminal.path} -> opacity ${terminal.opacity}, acrylic ${terminal.useAcrylic}${font ? `, font ${font.face} ${font.size}` : ""}${terminal.backup ? `\nbackup    ${terminal.backup}` : ""}`);
     else console.log(`terminal  skipped: ${terminal.error}`);
+  }
+  if (everywhere) {
+    // The desktop GUI is a different client: it needs its CSS over localStorage, which needs a DevTools port.
+    const desktop = await post("/api/desktop/apply", { theme, ui: { monoFont: arg("--font"), fontSize: Number(arg("--font-size", 13)), radius: 10, blur: 18 } });
+    if (desktop.ok) console.log(`desktop   CSS injected into ${desktop.target.url} (${desktop.cssBytes} bytes, theme-id untouched)`);
+    else console.log(`desktop   skipped: ${desktop.error}\n          ${desktop.hint}`);
   }
   console.log(`\nRestart opencode (the TUI reads cli.json at startup). Verify with:  opencode debug config`);
 } finally {
