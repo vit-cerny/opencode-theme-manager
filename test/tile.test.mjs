@@ -91,7 +91,9 @@ test("tiler snaps windows into a grid, touches only the named process, and resto
     assert.equal(fs.existsSync(stateFile), false, "one-shot undo state is consumed");
   } finally {
     for (const child of spawned) {
-      if (child.pid) spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      if (!child.pid) continue;
+      if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      else child.kill("SIGKILL");
     }
     if (fs.existsSync(stateFile)) fs.rmSync(stateFile, { force: true });
   }

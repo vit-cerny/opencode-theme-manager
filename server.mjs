@@ -39,7 +39,6 @@ function resolveConfigDir() {
 
 let configDir = resolveConfigDir();
 let terminalSettingsPath = flag("--terminal-settings");
-const projectsDir = path.join(here, "..");
 
 /* --------------------------------- helpers --------------------------------- */
 
@@ -75,20 +74,33 @@ function timestamp() {
 
 function backup(file) {
   if (!fs.existsSync(file)) return null;
-  const target = `${file}.bak.${timestamp()}`;
+  let target = `${file}.bak.${timestamp()}`;
+  // Same-second writes must not clobber each other's backup.
+  for (let n = 1; fs.existsSync(target); n++) target = `${file}.bak.${timestamp()}-${n}`;
   fs.copyFileSync(file, target);
   return target;
+}
+
+// Write through a temp file and rename: a crash mid-write can never leave a truncated config.
+function writeAtomic(file, text) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, text, "utf8");
+  fs.renameSync(tmp, file);
 }
 
 function writeJsonWithBackup(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const bak = backup(file);
-  fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n", "utf8");
+  writeAtomic(file, JSON.stringify(data, null, 2) + "\n");
   return { path: file, backup: bak };
 }
 
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function deepMerge(target, patch) {
   for (const [key, value] of Object.entries(patch || {})) {
+    if (DANGEROUS_KEYS.has(key)) continue;
     if (value && typeof value === "object" && !Array.isArray(value) && target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {
       deepMerge(target[key], value);
     } else if (value === null) {
@@ -107,9 +119,6 @@ function cliFile() {
 }
 function themeDir() {
   return path.join(configDir, "themes");
-}
-function projectThemeDir() {
-  return path.join(configDir, "..", "..", "themes");
 }
 function profileDir() {
   return path.join(configDir, "theme-manager");
@@ -184,6 +193,18 @@ function terminalSettingsCandidates() {
   return list;
 }
 
+// Windows Terminal stores profiles.list either as an array (current) or as an object keyed by
+// guid (older). Normalise both so the guid the UI shows is the guid we can write back.
+function terminalProfiles(doc) {
+  const defaults = doc.profiles?.defaults || {};
+  const raw = doc.profiles?.list;
+  // Keep the very same objects: the write path mutates them, so copies would silently drop the edit.
+  const list = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw || {}).map(([guid, profile]) => Object.assign(profile, { guid }));
+  return { defaults, list };
+}
+
 function terminalState() {
   const candidates = terminalSettingsPath ? [terminalSettingsPath] : terminalSettingsCandidates();
   const found = candidates.find((file) => fs.existsSync(file)) || null;
@@ -195,10 +216,10 @@ function terminalState() {
   } catch (error) {
     return { supported: true, path: found, candidates, error: error.message, profiles: [] };
   }
-  const defaults = doc.profiles?.defaults || {};
-  const profiles = Object.entries(doc.profiles?.list || []).map(([guid, profile]) => ({
-    guid,
-    name: profile.name || guid,
+  const { defaults, list } = terminalProfiles(doc);
+  const profiles = list.map((profile, index) => ({
+    guid: profile.guid || `index:${index}`,
+    name: profile.name || profile.guid || `profile ${index}`,
     font: profile.font || defaults.font || {},
     opacity: profile.opacity ?? defaults.opacity ?? 100,
     useAcrylic: profile.useAcrylic ?? defaults.useAcrylic ?? false,
@@ -267,7 +288,6 @@ const routes = {
     home,
     configDir,
     themeDir: themeDir(),
-    projectDir: projectsDir,
     cliFile: cliFile(),
     cli: loadCli(),
     themes: listThemes(),
@@ -333,6 +353,10 @@ const routes = {
 
   "POST /api/apply": (body) => {
     const name = safeName(body.name);
+    // Never point cli.json at a theme file that is not there: opencode would boot with a broken theme.
+    if (!fs.existsSync(path.join(themeDir(), `${name}.json`))) {
+      return { ok: false, error: `theme ${name}.json does not exist in ${themeDir()} - save it first` };
+    }
     const cli = loadCli();
     cli.$schema ||= "https://opencode.ai/v2/cli.json";
     cli.theme = { ...(cli.theme || {}), name };
@@ -349,20 +373,23 @@ const routes = {
   "POST /api/cli": (body) => {
     const patch = {};
     for (const [key, value] of Object.entries(body.patch || {})) {
-      if (CLI_KEYS.includes(key.split(".")[0])) patch[key] = value;
+      if (!CLI_KEYS.includes(key.split(".")[0])) continue;
+      // Dotted keys ("session.sidebar") must nest; a literal dotted key would silently do nothing.
+      deepMerge(patch, setNested(key, value));
     }
     const cli = deepMerge(loadCli(), patch);
     cli.$schema ||= "https://opencode.ai/v2/cli.json";
     const written = writeJsonWithBackup(cliFile(), cli);
-    return { ok: true, ...written, cli, applied: Object.keys(patch) };
+    return { ok: true, ...written, cli, applied: Object.keys(body.patch || {}) };
   },
 
   "POST /api/terminal": (body) => {
     const file = terminalSettingsPath || terminalSettingsCandidates().find((candidate) => fs.existsSync(candidate));
     if (!file) return { ok: false, error: "Windows Terminal settings.json not found", candidates: terminalSettingsCandidates() };
     const doc = readJson(file);
+    const { defaults, list } = terminalProfiles(doc);
     const guid = body.guid;
-    const target = guid ? doc.profiles.list.find((p) => p.guid === guid) : doc.profiles.defaults;
+    const target = guid ? list.find((profile) => profile.guid === guid) : defaults;
     if (!target) return { ok: false, error: `profile ${guid} not found` };
     const font = {};
     if (body.font) {
@@ -476,9 +503,8 @@ function setNested(key, value) {
 }
 
 function writeJsonWithBackupRaw(file, text) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   const bak = backup(file);
-  fs.writeFileSync(file, text, "utf8");
+  writeAtomic(file, text);
   return { path: file, backup: bak };
 }
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  CSS_KEYS, THEME_ID_KEY, applyToDesktop, bundledThemeIds, cdpEvaluate, clearDesktop, desktopCss, findDesktopApp, findDebugPort, readDesktopTheme,
+  CSS_KEYS, THEME_ID_KEY, applyToDesktop, bundledThemeIds, cdpEvaluate, clearDesktop, desktopCss, findDesktopApp, findDebugPort, probeTarget, readDesktopTheme,
 } from "../lib/desktop.mjs";
 
 // The desktop GUI cannot be driven from files, so the mechanism under test is the one it exposes:
@@ -66,11 +66,16 @@ before(async () => {
 });
 
 after(() => {
-  if (chromium?.pid) spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+  if (chromium?.pid) {
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+    else chromium.kill("SIGKILL");
+  }
   // Also reap any Chromium left behind by an earlier run of this test (matched by our temp profile
   // path only - never the user's browser).
-  spawnSync("powershell", ["-NoProfile", "-Command",
-    `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-desktop-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+  if (process.platform === "win32") {
+    spawnSync("powershell", ["-NoProfile", "-Command",
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-desktop-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+  }
   server?.kill();
   if (profile && fs.existsSync(profile)) {
     try {
@@ -144,6 +149,19 @@ test("CDP round-trip: refuses a foreign page, then injects into the app page", a
   assert.equal(after.theme, "oc-2");
   assert.equal(after.hasDark, false);
   assert.equal(after.hasLight, false);
+});
+
+test("a themed page on a foreign origin is not treated as the app", async (t) => {
+  if (!chrome) {
+    t.skip("no Chromium binary available for the CDP harness");
+    return;
+  }
+  const target = (await findDebugPort([DEBUG_PORT])).targets[0];
+  await cdpEvaluate(target.ws, 'document.documentElement.setAttribute("data-theme", "oc-2")');
+  const local = await probeTarget(target.ws, target.url);
+  const foreign = await probeTarget(target.ws, "https://tailwindcss.com/docs/installation");
+  assert.equal(local.isApp, true, "loopback page with data-theme is an app surface");
+  assert.equal(foreign.isApp, false, "the same page fetched from a remote origin would be refused");
 });
 
 test("a closed debug port fails with an actionable message", async () => {

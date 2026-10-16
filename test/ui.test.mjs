@@ -78,9 +78,14 @@ before(async () => {
 });
 
 after(() => {
-  if (chromium?.pid) spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
-  spawnSync("powershell", ["-NoProfile", "-Command",
-    `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-ui-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+  if (chromium?.pid) {
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+    else chromium.kill("SIGKILL");
+  }
+  if (process.platform === "win32") {
+    spawnSync("powershell", ["-NoProfile", "-Command",
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-ui-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+  }
   server?.kill();
   if (profile && fs.existsSync(profile)) {
     try {

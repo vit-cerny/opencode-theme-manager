@@ -50,8 +50,7 @@ before(async () => {
   fs.mkdirSync(path.join(configDir, "themes"), { recursive: true });
   fs.writeFileSync(path.join(configDir, "cli.json"), JSON.stringify({ $schema: "https://opencode.ai/v2/cli.json", theme: { name: "system" }, mouse: false }, null, 2));
   terminalFile = path.join(configDir, "wt-settings.json");
-  fs.writeFileSync(terminalFile, JSON.stringify({ profiles: { defaults: { font: { face: "Cascadia Mono", size: 11 }, opacity: 90, useAcrylic: true }, list: [{ guid: "{abc}", name: "PowerShell" }] } }, null, 2));
-  child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", configDir, "--terminal-settings", terminalFile], { cwd: repo });
+  fs.writeFileSync(terminalFile, JSON.stringify({ profiles: { defaults: { font: { face: "Cascadia Mono", size: 11 }, opacity: 90, useAcrylic: true }, list: [{ guid: "{abc}", name: "PowerShell" }] } }, null, 2));  child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", configDir, "--terminal-settings", terminalFile], { cwd: repo });
   const port = await waitForPort(child);
   base = `http://127.0.0.1:${port}`;
 });
@@ -145,6 +144,54 @@ test("layout patch merges whitelisted keys only", async () => {
   assert.equal(cli.tabs.layout, "vertical");
   assert.equal(cli.evil, undefined);
   assert.equal(cli.$schema, "https://opencode.ai/v2/cli.json");
+});
+
+test("dotted cli keys nest instead of becoming literal keys", async () => {
+  const result = await call("POST", "/api/cli", { patch: { "session.sidebar": "hide", "diffs.view": "split" } });
+  assert.equal(result.json.ok, true);
+  const cli = JSON.parse(fs.readFileSync(path.join(configDir, "cli.json"), "utf8"));
+  assert.equal(cli["session.sidebar"], undefined, "no literal dotted key");
+  assert.equal(cli.session.sidebar, "hide", "session.sidebar nested");
+  assert.equal(cli.diffs.view, "split", "diffs.view nested");
+});
+
+test("prototype-polluting keys never reach cli.json", async () => {
+  const result = await call("POST", "/api/cli", { patch: { tabs: { __proto__: { polluted: true }, layout: "horizontal" }, "session.__proto__": "x" } });
+  assert.equal(result.json.ok, true);
+  const cli = JSON.parse(fs.readFileSync(path.join(configDir, "cli.json"), "utf8"));
+  assert.equal({}.polluted, undefined, "Object.prototype untouched");
+  assert.equal(cli.tabs.layout, "horizontal", "legitimate sibling still applied");
+});
+
+test("the Windows Terminal guid the panel shows is the guid it writes", async () => {
+  const state = await call("GET", "/api/state");
+  const profile = state.json.terminal.profiles[0];
+  assert.ok(profile?.guid, "a profile with a guid is reported");
+  assert.equal(profile.guid, "{abc}", "array-form settings report the real guid, not an index");
+  const result = await call("POST", "/api/terminal", { guid: profile.guid, opacity: 55 });
+  assert.equal(result.json.ok, true, JSON.stringify(result.json));
+  const doc = JSON.parse(fs.readFileSync(terminalFile, "utf8"));
+  assert.equal(doc.profiles.list[0].opacity, 55, "the profile itself was updated");
+});
+
+test("two saves in the same second keep two backups", async () => {
+  const design = await call("POST", "/api/design", { prompt: "gruvbox glass", transparency: 40 });
+  const file = path.join(configDir, "themes", "same-second.json");
+  const first = await call("POST", "/api/save", { name: "same-second", theme: design.json.theme });
+  const second = await call("POST", "/api/save", { name: "same-second", theme: design.json.theme });
+  assert.ok(first.json.ok && second.json.ok);
+  assert.ok(second.json.backup, "second save left a backup");
+  assert.notEqual(first.json.backup, second.json.backup, "the two backups are different files");
+  assert.ok(fs.existsSync(second.json.backup));
+  assert.equal(fs.readFileSync(file, "utf8").length > 1000, true, "final file is complete");
+});
+
+test("apply refuses a theme that does not exist", async () => {
+  const result = await call("POST", "/api/apply", { name: "no-such-theme" });
+  assert.equal(result.json.ok, false);
+  assert.match(result.json.error, /does not exist/);
+  const cli = JSON.parse(fs.readFileSync(path.join(configDir, "cli.json"), "utf8"));
+  assert.notEqual(cli.theme.name, "no-such-theme", "cli.json was not pointed at a missing theme");
 });
 
 test("terminal transparency + font write into Windows Terminal settings with a backup", async () => {

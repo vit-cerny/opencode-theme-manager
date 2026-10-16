@@ -92,6 +92,23 @@ checks:
 Not verifiable here: what the themed GUI actually looks like - the vision subagent is
 unavailable (killed repeatedly by server restarts), so GUI appearance is unverified by me.
 
+## Result: done (phase 5: review + deployment)
+
+objective: "how do i use it, make easy deployment and uninstall, put it on github, review the entire project and test it"
+
+| Criterion | Evidence |
+|---|---|
+| Review by someone other than the author | `reviewer` subagent, read-only, ranked 15 findings with file:line (6 must-fix, 6 should-fix, 3 notes) and 3 "verified fine" lines |
+| Every must-fix fixed | 1) `/api/cli` dotted keys now nest through `setNested` (they silently created a literal `"session.sidebar"` key); 2) Windows Terminal `profiles.list` may be an array - guids are real guids again and the write reaches the file (my first fix copied the objects; the new test caught that); 3) desktop injection now requires a local-looking URL *and* the app marker, and writes to every app window instead of the first; 4) backups get a uniqueness suffix and writes go through tmp+rename; 5) `__proto__`/`constructor`/`prototype` are refused in merges; 6) `/api/apply` refuses a theme file that does not exist |
+| Should-fix taken | dead code removed (`projectThemeDir`, `projectsDir`/`projectDir`, unused imports, duplicate CSS-key constant); portability guards around `taskkill`; `tools/desktop-apply.mjs --glass` now applies live instead of reloading; README/GOAL test counts and panel names corrected |
+| Regression tests added | 6 new: dotted cli keys, prototype pollution, WT guid round-trip, same-second double backup, apply-refuses-missing-theme, foreign-origin refusal |
+| Truth pass | README test counts said 46 and 56; both now read 62 (actual `node --test test/`). Panel label corrected to `6 · Layout & tabs (cli.json)`. Theme-id lever documented as keeping the injected CSS |
+| Deployment verified end to end | `install.ps1` -> 63 files incl. `docs/`, Desktop + Start menu shortcuts, installed copy served `GET /api/state` with 103 tokens / 35 presets; `uninstall.ps1` -> target folder and both shortcuts gone, `~/.config/opencode/themes` untouched (still 2 files) |
+| Tests | `node --test test/` **62/62**; `python tools/ui-e2e.py` **10/10 PLAYWRIGHT PASS**; `tools/check.mjs` all examples + 35 presets; `tools/serve-smoke.mjs` pass; `tools/apply.mjs --everywhere` against a temp config wrote theme + cli.json + terminal |
+| Published | github.com/vit-cerny/opencode-theme-manager, tag `v0.1.0` |
+
+Known residual risk (documented, not hidden): a *local* page (loopback/file/app scheme) that happens to set `data-theme` could still be mistaken for the app if it also sits behind the probed DevTools port. The port default is 9222, the port our own launcher opens.
+
 status: done
 
 

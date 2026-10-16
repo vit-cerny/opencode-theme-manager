@@ -96,12 +96,12 @@ if (has("--css")) {
   css = desktopCss(resolved.dark, bundle.ui);
   const light = desktopCss(resolved.light, bundle.ui);
   const themeId = arg("--theme-id", themeIds.includes("nord") ? "nord" : null);
-  const result = await applyToDesktop({ css, light, themeId, port, reload: true });
+  const result = await applyToDesktop({ css, light, themeId, port, reload: false });
   console.log(`\nprompt:    ${prompt}`);
   console.log(`injected:  ${css.split("\n").length} lines of CSS into ${result.target.url}`);
   console.log(`target:    ${result.target.title || "(untitled)"}`);
   console.log(`stored:    ${JSON.stringify(result.result)}`);
-  console.log("\nthe window reloads itself; if it still looks stock, reload it manually (Ctrl+R).");
+  console.log(`windows:   ${result.applied.length} app window(s) updated live (no reload)`);
   process.exit(0);
 }
 

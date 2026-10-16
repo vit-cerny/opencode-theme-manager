@@ -25,7 +25,7 @@ if ((Test-Path $TargetDir) -and -not $Force) {
   if ($existing) { throw "$TargetDir already exists. Re-run with -Force to overwrite (your themes and cli.json are never touched)." }
 }
 
-$paths = @('server.mjs', 'start.cmd', 'README.md', 'LICENSE', 'package.json', 'lib', 'ui', 'presets', 'examples', 'tools')
+$paths = @('server.mjs', 'start.cmd', 'README.md', 'LICENSE', 'package.json', 'lib', 'ui', 'presets', 'examples', 'tools', 'docs')
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 foreach ($item in $paths) {
   $from = Join-Path $source $item
@@ -44,24 +44,32 @@ $launcher = @(
 Set-Content -Path (Join-Path $TargetDir 'launch.cmd') -Value $launcher -Encoding ASCII
 
 if (-not $NoShortcut) {
-  $desktop = [Environment]::GetFolderPath('Desktop')
-  $link = Join-Path $desktop 'OpenCode Theme Manager.lnk'
   $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($link)
-  $shortcut.TargetPath = (Join-Path $TargetDir 'launch.cmd')
-  $shortcut.WorkingDirectory = $TargetDir
-  $shortcut.IconLocation = "$env:SystemRoot\System32\imageres.dll,68"
-  $shortcut.Description = 'OpenCode Theme Manager'
-  $shortcut.Save()
-  Write-Host "  shortcut: $link"
+  $targets = @(
+    @{ Path = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'OpenCode Theme Manager.lnk'); Label = 'Desktop' },
+    @{ Path = (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\OpenCode Theme Manager.lnk'); Label = 'Start menu' }
+  )
+  foreach ($item in $targets) {
+    $shortcut = $shell.CreateShortcut($item.Path)
+    $shortcut.TargetPath = (Join-Path $TargetDir 'launch.cmd')
+    $shortcut.WorkingDirectory = $TargetDir
+    $shortcut.IconLocation = "$env:SystemRoot\System32\imageres.dll,68"
+    $shortcut.Description = 'OpenCode Theme Manager'
+    $shortcut.Save()
+    Write-Host "  shortcut ($($item.Label)): $($item.Path)"
+  }
 }
 
-Write-Host ""
-Write-Host "installed. start it with:" -ForegroundColor Green
-Write-Host "  `"$TargetDir\launch.cmd`"          # opens http://127.0.0.1:4289/"
-Write-Host "or just double-click the Desktop shortcut."
-Write-Host ""
-Write-Host "uninstall with:"
-Write-Host "  powershell -ExecutionPolicy Bypass -File `"$TargetDir\..\opencode-theme-manager\uninstall.ps1`""
-Write-Host "  (or keep a copy of uninstall.ps1 next to launch.cmd)"
 Copy-Item (Join-Path $source 'uninstall.ps1') -Destination $TargetDir -Force
+
+Write-Host ""
+Write-Host "How to use it:" -ForegroundColor Green
+Write-Host "  1. start it:  `"$TargetDir\launch.cmd`"        (or the Desktop shortcut)"
+Write-Host "  2. in the browser:  type a look, press 'Make it look like this', then 'Apply to opencode'"
+Write-Host "  3. once, for the desktop GUI:  '7 - Desktop app' -> 'Restart app with theming', then 'Apply glass CSS'"
+Write-Host ""
+Write-Host "One command instead of the UI (also useful in scripts):"
+Write-Host "  node `"$TargetDir\tools\apply.mjs`" --everywhere --prompt `"nord blue frosted glass`""
+Write-Host ""
+Write-Host "Uninstall (keeps your themes and cli.json):"
+Write-Host "  powershell -ExecutionPolicy Bypass -File `"$TargetDir\uninstall.ps1`""

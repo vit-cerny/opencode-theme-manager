@@ -1,8 +1,8 @@
 // OpenCode Theme Manager - UI logic. Reuses the same model as the server (lib/*.mjs), so the
 // browser and the tests can never disagree about what a theme means.
 import {
-  ALL_HUES, HUE_STEPS, TOKEN_PATHS, applyTransparency, buildTheme, designToCss, defaultDesign,
-  hexToRgb, hueScale, mixColors, resolveHues, resolveTheme, rgbToHex, tuneColor, validateTheme, webCssSnippet, desktopClientCss,
+  ALL_HUES, HUE_STEPS, TOKEN_PATHS, buildTheme, designToCss, defaultDesign,
+  hexToRgb, hueScale, resolveHues, resolveTheme, rgbToHex, tuneColor, validateTheme, webCssSnippet, desktopClientCss,
 } from "/lib/schema.mjs";
 import { interpretPrompt, paletteToDesign } from "/lib/designer.mjs";
 

@@ -9,6 +9,28 @@ binds `127.0.0.1` and every file it overwrites is backed up first.
 
 ![the manager](docs/screenshot.jpg)
 
+## Three steps
+
+```powershell
+# 1. install (one line, no npm)
+git clone https://github.com/vit-cerny/opencode-theme-manager.git; cd opencode-theme-manager; .\install.ps1
+#    -> copies to %LOCALAPPDATA%\Programs, adds Desktop + Start menu shortcuts, prints this list
+
+# 2. make it look like something
+node tools\apply.mjs --everywhere --prompt "nord blue frosted glass, 45% transparency"
+#    or open the app and do it visually: type a look -> Make it look like this -> Apply to opencode
+
+# 3. once for the desktop GUI (its own theme system, see below)
+node tools\desktop-apply.mjs --glass --restart
+```
+
+Then restart the terminal client. Uninstall keeps your themes and `cli.json`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\uninstall.ps1      # removes the app folder + both shortcuts
+```
+
+
 ## Run it
 
 ```powershell
@@ -74,7 +96,7 @@ several sessions side by side inside one window (panel *6 · Layout & tabs*).
 Verify both without trusting me:
 
 ```powershell
-node --test test/          # 56 tests, incl. UI tests that drive the real manager in headless Chrome
+node --test test/          # 62 tests, incl. UI tests that drive the real manager in headless Chrome
 python tools/ui-e2e.py     # optional, needs pip install playwright: real browser, real clicks, writes docs/ui-check.png
 ```
 
@@ -87,7 +109,7 @@ its own `resources/app.asar`: the only levers are three `localStorage` keys its 
 
 | Lever | Key | What it does |
 |---|---|---|
-| GUI theme | `opencode-theme-id` | picks one of the bundled themes |
+| Theme id | `opencode-theme-id` | picks one of the bundled themes (the injected CSS stays, so you can pair a bundled palette with the glass look; `--clear` removes both) |
 | GUI CSS | `opencode-theme-css-dark` / `...-light` | raw CSS injected into the app on startup |
 
 Driving `localStorage` needs a DevTools port, so the app has to be started once with
@@ -180,7 +202,7 @@ what makes terminal transparency visible.
 alignment, sidebar width, header and status heights. These drive the live preview and the exported
 `preview.css`, and the font face writes into your Windows Terminal profile.
 
-**6 · Layout & tabs.** The knobs opencode actually has - `session.sidebar`, `session.scrollbar`,
+**6 · Layout & tabs (cli.json).** The knobs opencode actually has - `session.sidebar`, `session.scrollbar`,
 `tabs.mode/scope/layout/indicators`, `diffs.view/tree`, `cursor.style`, `animations`, `mouse` - written
 into `cli.json`.
 
@@ -218,7 +240,7 @@ found). So:
 ## Checks
 
 ```powershell
-node --test test/          # 46 tests: schema, hue ladders, transparency, prompt/image design, full API round-trip
+node --test test/          # 62 tests: schema, hue ladders, transparency, prompt/image design, full API round-trip, desktop CDP, tiler, UI
 node tools/check.mjs       # validates the shipped example themes + all 35 presets
 node tools/serve-smoke.mjs # boots the server against the real config, read-only, writes nothing
 node tools/make-examples.mjs  # regenerates examples/glass.json, glass-v1.json, preview.css

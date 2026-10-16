@@ -26,10 +26,15 @@ if (Test-Path $TargetDir) {
 }
 
 if (-not $KeepShortcut) {
-  $link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'OpenCode Theme Manager.lnk'
-  if (Test-Path $link) {
-    Remove-Item -Force $link
-    Write-Host "  removed $link"
+  $links = @(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'OpenCode Theme Manager.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\OpenCode Theme Manager.lnk')
+  )
+  foreach ($link in $links) {
+    if (Test-Path $link) {
+      Remove-Item -Force $link
+      Write-Host "  removed $link"
+    }
   }
 }
 
