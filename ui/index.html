@@ -212,7 +212,25 @@
       </details>
 
       <details class="panel">
-        <summary>7 · CSS</summary>
+        <summary>7 · Desktop app (GUI)</summary>
+        <div class="panel-body">
+          <div class="hint" id="desktopInfo">checking for the opencode desktop app...</div>
+          <div class="row">
+            <label class="field grow"><span>Bundled GUI theme</span><select id="desktopThemeId"></select></label>
+            <button id="btnDesktopTheme" class="btn">Switch GUI theme</button>
+          </div>
+          <div class="row">
+            <button id="btnDesktopGlass" class="btn btn-accent grow">Apply glass CSS to desktop app</button>
+            <button id="btnDesktopRestart" class="btn">Restart app with theming</button>
+            <button id="btnDesktopClear" class="btn">Clear override</button>
+          </div>
+          <div class="hint">The desktop GUI is a Chromium shell with its own 36 bundled themes and no config file: the only levers are <code>localStorage</code> keys its preload reads (<code>opencode-theme-id</code>, <code>opencode-theme-css-dark/light</code>). Driving them needs a DevTools port, so the app has to be restarted once with <code>--remote-debugging-port=9222</code> - that is what <b>Restart app with theming</b> does. Terminal version: <code>node tools/desktop-apply.mjs --glass --restart</code></div>
+          <div class="hint" id="desktopResult"></div>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>8 · CSS</summary>
         <div class="panel-body">
           <textarea id="customCss" rows="7" spellcheck="false" placeholder=".tui-sidebar { letter-spacing: .2px }&#10;.tui-prompt { box-shadow: 0 12px 40px #0006 }"></textarea>
           <div class="row">
@@ -226,7 +244,7 @@
       </details>
 
       <details class="panel">
-        <summary>8 · Files</summary>
+        <summary>9 · Files</summary>
         <div class="panel-body">
           <div class="row">
             <label class="field grow"><span>Load saved theme</span><select id="savedThemes"></select></label>

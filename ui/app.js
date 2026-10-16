@@ -2,7 +2,7 @@
 // browser and the tests can never disagree about what a theme means.
 import {
   ALL_HUES, HUE_STEPS, TOKEN_PATHS, applyTransparency, buildTheme, designToCss, defaultDesign,
-  hexToRgb, hueScale, mixColors, resolveHues, resolveTheme, rgbToHex, tuneColor, validateTheme, webCssSnippet,
+  hexToRgb, hueScale, mixColors, resolveHues, resolveTheme, rgbToHex, tuneColor, validateTheme, webCssSnippet, desktopClientCss,
 } from "/lib/schema.mjs";
 import { interpretPrompt, paletteToDesign } from "/lib/designer.mjs";
 
@@ -537,9 +537,58 @@ const handler = {
   },
   async desktopCss() {
     const css = designToCss({ ...state.ui, customCss: state.ui.customCss }, state.resolved[state.mode]);
-    const result = await api("/api/desktop", { css });
+    const result = await api("/api/desktop/css", { css });
     if (result.ok === false) return setStatus(result.error, "bad");
     setStatus(`desktop CSS written to ${result.path} (backup ${result.backup}). ${result.note}`);
+  },
+  async desktopInfo() {
+    const info = await api("/api/desktop");
+    state.desktop = info;
+    const app = info.app;
+    const target = info.debug.port ? `${info.debug.port} -> ${info.debug.targets.map((t) => t.url).join(", ")}` : "closed (needs a restart with theming)";
+    $("desktopInfo").innerHTML = app.installed
+      ? `app: <code>${app.exe}</code><br>profile: <code>${app.profile}</code><br>bundled themes: ${info.themeIds.length} · devtools port: ${target}${info.debug.current?.theme ? ` · current GUI theme: <code>${info.debug.current.theme}</code>` : ""}`
+      : `no opencode desktop app found on this machine (looked in ${app.root || "%-LOCALAPPDATA%\\Programs"})`;
+    const select = $("desktopThemeId");
+    if (select.options.length !== info.themeIds.length) {
+      select.innerHTML = "";
+      for (const id of info.themeIds) {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = id;
+        select.appendChild(option);
+      }
+      if (info.themeIds.includes("nord")) select.value = "nord";
+    }
+  },
+  async desktopApplyTheme() {
+    const result = await api("/api/desktop/apply", { themeId: $("desktopThemeId").value, port: state.desktop?.debug?.port || undefined });
+    if (result.ok === false) return setStatus(`desktop: ${result.error}. ${result.hint || ""}`, "bad");
+    setStatus(`GUI theme set to ${$("desktopThemeId").value} on ${result.target.url}`, "ok");
+    await handler.desktopInfo();
+  },
+  async desktopGlass() {
+    const css = desktopClientCss(state.resolved[state.mode], { ...state.ui, customCss: state.ui.customCss });
+    const light = desktopClientCss(state.resolved.light, { ...state.ui, customCss: state.ui.customCss });
+    const result = await api("/api/desktop/apply", { css, light, themeId: $("desktopThemeId").value || null, port: state.desktop?.debug?.port || undefined });
+    if (result.ok === false) {
+      $("desktopResult").innerHTML = `<b>could not reach the desktop app</b><br>${result.error}<br><code>${result.hint}</code>`;
+      return setStatus("desktop: needs a one-time restart with theming", "bad");
+    }
+    $("desktopResult").innerHTML = `injected ${css.length} bytes into <code>${result.target.url}</code> · stored keys: ${Object.keys(result.result).filter((k) => k !== "origin").join(", ")}`;
+    setStatus("desktop CSS injected - the window reloads itself", "ok");
+  },
+  async desktopRestart() {
+    const result = await api("/api/desktop/restart", { port: state.desktop?.debug?.port || undefined });
+    if (result.ok === false) return setStatus(result.error, "bad");
+    setStatus("restarting the desktop app with DevTools enabled - wait ~5s, then Apply glass CSS again", "ok");
+    setTimeout(() => handler.desktopInfo().catch(() => {}), 6000);
+  },
+  async desktopClear() {
+    const result = await api("/api/desktop/clear", { port: state.desktop?.debug?.port || undefined });
+    if (result.ok === false) return setStatus(`desktop: ${result.error}`, "bad");
+    setStatus("desktop override cleared - the app is back to its own theme settings", "ok");
+    await handler.desktopInfo();
   },
   async copySnippet() {
     const css = designToCss({ ...state.ui, customCss: state.ui.customCss }, state.resolved[state.mode]);
@@ -658,6 +707,10 @@ function wire() {
     setStatus("custom CSS applied to the preview");
   });
   $("btnCssSnippet").addEventListener("click", () => handler.copySnippet().catch((error) => setStatus(error.message, "bad")));
+  $("btnDesktopTheme").addEventListener("click", () => handler.desktopApplyTheme().catch((error) => setStatus(error.message, "bad")));
+  $("btnDesktopGlass").addEventListener("click", () => handler.desktopGlass().catch((error) => setStatus(error.message, "bad")));
+  $("btnDesktopRestart").addEventListener("click", () => handler.desktopRestart().catch((error) => setStatus(error.message, "bad")));
+  $("btnDesktopClear").addEventListener("click", () => handler.desktopClear().catch((error) => setStatus(error.message, "bad")));
   $("importFile").addEventListener("change", (event) => handler.import(event.target.files[0]).catch((error) => setStatus(error.message, "bad")));
   $("btnLoad").addEventListener("click", () => handler.loadSaved($("savedThemes").value).catch((error) => setStatus(error.message, "bad")));
 
@@ -685,6 +738,7 @@ async function boot() {
   syncTypeControls();
   rebuild();
   renderHues();
+  handler.desktopInfo().catch(() => {});
   setStatus("ready - describe a look, drop an image, or tune the palette");
 }
 

@@ -14,6 +14,9 @@ import {
   buildTheme, designToCss, defaultDesign, importV1, resolveHues, resolveTheme, validateTheme, TOKEN_PATHS, ALL_HUES, WEB_CSS_KEYS,
 } from "./lib/schema.mjs";
 import { designFromInput, interpretPrompt, paletteFromThemeSeed, paletteToDesign } from "./lib/designer.mjs";
+import {
+  DEFAULT_DEBUG_PORT, applyToDesktop, bundledThemeIds, clearDesktop, desktopCss, findDesktopApp, findDebugPort, launchDesktopWithDebugging, probeTarget,
+} from "./lib/desktop.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -374,12 +377,69 @@ const routes = {
     return { ok: true, ...written, applied: font, opacity: target.opacity, useAcrylic: target.useAcrylic, terminal: terminalState() };
   },
 
-  "POST /api/desktop": (body) => {
+  "POST /api/desktop/css": (body) => {
     const css = String(body.css || "");
     const target = desktopState().cssPath;
     if (!css.trim()) return { ok: false, error: "empty css" };
     const written = writeJsonWithBackupRaw(target, css);
     return { ok: true, ...written, note: desktopState().note };
+  },
+
+  "GET /api/desktop": async () => {
+    const app = findDesktopApp();
+    const found = await findDebugPort();
+    const probes = [];
+    if (found) {
+      for (const target of found.targets) {
+        const probe = await probeTarget(target.ws);
+        probes.push({ url: target.url, title: target.title, isApp: probe.isApp, theme: probe.theme, hasDark: probe.hasDark, hasLight: probe.hasLight, error: probe.error });
+      }
+    }
+    const appTarget = probes.find((probe) => probe.isApp) || null;
+    return {
+      app,
+      themeIds: bundledThemeIds(),
+      debug: { defaultPort: DEFAULT_DEBUG_PORT, port: found?.port ?? null, probes, current: appTarget },
+      keys: { theme: "opencode-theme-id", dark: "opencode-theme-css-dark", light: "opencode-theme-css-light" },
+    };
+  },
+
+  "POST /api/desktop/apply": async (body) => {
+    const resolvedDark = body.resolved?.dark || resolveTheme(body.theme || {}, "dark");
+    const resolvedLight = body.resolved?.light || resolveTheme(body.theme || {}, "light");
+    const css = body.css ?? desktopCss(resolvedDark, body.ui || {});
+    const light = body.light ?? (body.css ? body.css : desktopCss(resolvedLight, body.ui || {}));
+    try {
+      const result = await applyToDesktop({
+        css,
+        light,
+        themeId: body.themeId || null,
+        scheme: body.scheme || null,
+        port: Number(body.port) || DEFAULT_DEBUG_PORT,
+        reload: body.reload !== false,
+      });
+      return { ok: true, ...result, cssBytes: css.length };
+    } catch (error) {
+      return { ok: false, error: error.message, hint: `run: node tools/desktop-apply.mjs --glass --restart (opens --remote-debugging-port=${DEFAULT_DEBUG_PORT})` };
+    }
+  },
+
+  "POST /api/desktop/clear": async (body) => {
+    try {
+      const result = await clearDesktop(Number(body.port) || DEFAULT_DEBUG_PORT);
+      return { ok: true, ...result };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  },
+
+  "POST /api/desktop/restart": (body) => {
+    try {
+      const launched = launchDesktopWithDebugging({ port: Number(body.port) || DEFAULT_DEBUG_PORT, kill: true });
+      return { ok: true, ...launched, note: "the app was closed and is starting again with DevTools enabled; wait a few seconds, then apply" };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
   },
 
   "POST /api/profile": (body) => {
@@ -434,7 +494,7 @@ function serveStatic(res, urlPath) {
   return send(res, 200, fs.readFileSync(file), MIME[path.extname(file)] || "application/octet-stream");
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
   const key = `${req.method} ${url.pathname}`;
   if (req.method === "GET" && (url.pathname === "/" || url.pathname.startsWith("/ui/") || url.pathname.startsWith("/lib/") || url.pathname.startsWith("/presets/") || url.pathname.startsWith("/docs/") || url.pathname.startsWith("/examples/"))) {
@@ -444,7 +504,7 @@ const server = http.createServer((req, res) => {
   if (!handler) return send(res, 404, { error: `no route for ${key}` });
   if (req.method === "GET") {
     try {
-      return send(res, 200, handler(url.searchParams));
+      return send(res, 200, await handler(url.searchParams));
     } catch (error) {
       return send(res, 400, { error: error.message });
     }
@@ -454,10 +514,10 @@ const server = http.createServer((req, res) => {
     raw += chunk;
     if (raw.length > 12_000_000) req.destroy();
   });
-  req.on("end", () => {
+  req.on("end", async () => {
     try {
       const body = raw ? JSON.parse(raw) : {};
-      const result = handler(body, url.searchParams);
+      const result = await handler(body, url.searchParams);
       send(res, result && result.ok === false && result.validation ? 422 : 200, result);
     } catch (error) {
       send(res, 400, { error: error.message });

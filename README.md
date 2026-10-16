@@ -44,7 +44,43 @@ node tools/apply.mjs --name glass --prompt "nord blue frosted glass, 45% transpa
 through. Add `--font "JetBrains Mono" --font-size 13` if you want the font written too.
 `--file examples/glass.json` applies a theme you already have.
 
+## The desktop app (the GUI, not the TUI)
+
+If your opencode is the **desktop app** (`@opencode-aidesktop`, `OpenCode.exe`), that app does *not*
+read your TUI theme file. It is a Chromium shell around the opencode web client with **its own 36
+bundled themes** (`oc-2`, `nord`, `tokyonight`, ...) and no config file for them - verified against
+its own `resources/app.asar`: the only levers are three `localStorage` keys its preload script reads.
+
+| Lever | Key | What it does |
+|---|---|---|
+| GUI theme | `opencode-theme-id` | picks one of the bundled themes |
+| GUI CSS | `opencode-theme-css-dark` / `...-light` | raw CSS injected into the app on startup |
+
+Driving `localStorage` needs a DevTools port, so the app has to be started once with
+`--remote-debugging-port=9222`. One command does the restart, the injection and the reload:
+
+```powershell
+node tools/desktop-apply.mjs --list                # is the app installed, which themes ship, is a port open
+node tools/desktop-apply.mjs --glass --restart     # restart with DevTools + inject the glass CSS
+node tools/desktop-apply.mjs --theme-id nord       # just switch the GUI to a bundled theme
+node tools/desktop-apply.mjs --clear               # back to the app's own settings
+```
+
+In the manager UI the same thing lives under **7 · Desktop app (GUI)**: it lists the bundled themes,
+injects the CSS built from your current palette and fonts, and can restart the app for you.
+
+The injection refuses to touch anything that is not the app: a candidate page is only written to if
+its preload has set `data-theme` on `<html>` (or the theme id is already stored), so a browser tab
+that happens to expose a debug port is left alone.
+
+**What the GUI can and cannot do.** Colours, fonts, radius and translucency *inside* the window are
+CSS, so they work. True wallpaper see-through needs a transparent window, which the app does not
+expose; the closest honest equivalent is a translucent surface stack over a dark base. The app also
+reads `backgroundColor` from `%APPDATA%\ai.opencode.desktop\opencode.settings` for its window fill -
+that one is a plain file, no DevTools needed.
+
 ### "I applied it but opencode looks the same"
+
 
 Work down this list - each line is a thing that has to be true:
 
