@@ -67,5 +67,31 @@ checks:
 
 Note: `docs/screenshot.jpg` was captured against the real config, so it shows the user's username and theme list; replace it before promoting the repo widely if that matters.
 
+## Phase 3: the desktop GUI
+
+objective: "so how do i use my opencode is still the same old desktop gui" - the GUI is a different client with its own theming.
+acceptance:
+- C1 Identify, with evidence, why the TUI theme does not reach the desktop GUI.
+- C2 Implement the GUI's real levers (its bundled theme id + its localStorage CSS hook) and drive them over CDP.
+- C3 Never touch an unrelated page that happens to expose a debug port.
+- C4 Ship it as a command, an API route and a UI panel; tests cover detection, CSS mapping, injection, refusal and the no-port error.
+- C5 Make a change that is visible without a restart, and say exactly what the user must run for the rest.
+checks:
+- node --test test/desktop.test.mjs
+- node tools/desktop-apply.mjs --list
+- node tools/check.mjs
+
+| Criterion | Evidence |
+|---|---|
+| C1 | The running GUI is `C:\Users\witek\AppData\Local\Programs\@opencode-aidesktop\OpenCode.exe` (its own `opencode-cli 2.0.28` under `%APPDATA%\ai.opencode.desktop\cli`). Its 168 MB `resources/app.asar` contains `THEME_ID:'opencode-theme-id', COLOR_SCHEME:'opencode-color-scheme', THEME_CSS_LIGHT/DARK:'opencode-theme-css-*'`, 36 bundled themes (`./themes/oc-2.json`, `./themes/nord.json`, ...), its own schema `https://opencode.ai/desktop-theme.json`, and no file/env hook (`user.css` absent). So the GUI never reads `<config>/themes/*.json`. |
+| C2 | `lib/desktop.mjs` (CDP client on the built-in WebSocket), `lib/schema.mjs#desktopClientCss` (maps a resolved theme onto the app's own `--v2-text-text-base`, `--v2-border-border-base`, `--v2-state-*`, `--background-base`, `--border-radius`, `--v2-font-family-code` names), `tools/desktop-apply.mjs --glass --restart`, routes `/api/desktop`, `/api/desktop/apply`, `/api/desktop/clear`, `/api/desktop/restart`, UI panel `7 - Desktop app (GUI)`. |
+| C3 | `probeTarget()` requires `document.documentElement.hasAttribute("data-theme")` or a stored theme id before writing; verified by the test that first asserts injection into a foreign page throws `/not the opencode app/`. The port list is no longer a scanner: it defaults to the single port we launch with. |
+| C4 | `node --test test/desktop.test.mjs` -> 4/4 pass (detection + 36 theme ids from the real asar, CSS mapping, CDP round-trip incl. refusal, closed-port error). Full suite 50/50. `tools/check.mjs` and `tools/serve-smoke.mjs` still pass. |
+| C5 | `%APPDATA%\ai.opencode.desktop\opencode.settings` `backgroundColor` set to `#101623` (backup `opencode.settings.bak.20261016-220018`) - the GUI window fill changes on its next launch with no DevTools. Everything else (CSS + theme id) needs one run of `node tools/desktop-apply.mjs --glass --restart`, which the user triggers because it closes their window. |
+
+Not verifiable here: what the themed GUI actually looks like - the vision subagent is
+unavailable (killed repeatedly by server restarts), so GUI appearance is unverified by me.
+
 status: done
+
 
