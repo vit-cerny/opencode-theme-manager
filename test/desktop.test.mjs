@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   CSS_KEYS, THEME_ID_KEY, applyToDesktop, bundledThemeIds, cdpEvaluate, clearDesktop, desktopCss, findDesktopApp, findDebugPort, readDesktopTheme,
@@ -28,7 +28,8 @@ let server = null;
 let chromium = null;
 let base = "";
 let profile = "";
-const DEBUG_PORT = 9411;
+// Fresh port per run: a leaked Chromium from an earlier run would otherwise keep the old one bound.
+const DEBUG_PORT = 9420 + (process.pid % 40);
 
 function waitFor(pattern, stream, timeoutMs = 20_000) {
   return new Promise((resolve, reject) => {
@@ -65,7 +66,11 @@ before(async () => {
 });
 
 after(() => {
-  chromium?.kill();
+  if (chromium?.pid) spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+  // Also reap any Chromium left behind by an earlier run of this test (matched by our temp profile
+  // path only - never the user's browser).
+  spawnSync("powershell", ["-NoProfile", "-Command",
+    `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-desktop-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
   server?.kill();
   if (profile && fs.existsSync(profile)) {
     try {

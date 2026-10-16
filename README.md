@@ -44,6 +44,26 @@ node tools/apply.mjs --name glass --prompt "nord blue frosted glass, 45% transpa
 through. Add `--font "JetBrains Mono" --font-size 13` if you want the font written too.
 `--file examples/glass.json` applies a theme you already have.
 
+## Several agents at once
+
+The GUI has no split panes (its bundle only ships `New Window` / `New Session`), so parallel viewing is
+windows + a grid:
+
+```powershell
+# in the app: File -> New Window once per session you want to watch, then:
+powershell -ExecutionPolicy Bypass -File .\tools\tile.ps1 -Layout grid     # 2x2
+powershell -ExecutionPolicy Bypass -File .\tools\tile.ps1 -Layout 2x1       # two side by side (columns x rows)
+powershell -ExecutionPolicy Bypass -File .\tools\tile.ps1 -List             # what it can see, without moving anything
+powershell -ExecutionPolicy Bypass -File .\tools\tile.ps1 -Restore          # undo one tiling
+```
+
+Layouts accept `NxM` (columns x rows), or the aliases `side-by-side`, `stacked`, `grid`. It only
+touches visible top-level windows of `-ProcessName` (default `OpenCode`), keeps the previous
+positions for a one-level undo, and reports the geometry as JSON with `-Json`.
+
+In the terminal client you do not need windows at all: `cli.json` `tabs.mode` + `tabs.layout` puts
+several sessions side by side inside one window (panel *6 · Layout & tabs*).
+
 ## The desktop app (the GUI, not the TUI)
 
 If your opencode is the **desktop app** (`@opencode-aidesktop`, `OpenCode.exe`), that app does *not*
