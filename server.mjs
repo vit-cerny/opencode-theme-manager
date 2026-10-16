@@ -259,7 +259,7 @@ function bundleFromRequest(body) {
 
 /* ---------------------------------- routes ---------------------------------- */
 
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".webp": "image/webp" };
+const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon" };
 
 const routes = {
   "GET /api/state": () => ({
@@ -416,7 +416,8 @@ const routes = {
         themeId: body.themeId || null,
         scheme: body.scheme || null,
         port: Number(body.port) || DEFAULT_DEBUG_PORT,
-        reload: body.reload !== false,
+        reload: body.reload === true,
+        live: body.live !== false,
       });
       return { ok: true, ...result, cssBytes: css.length };
     } catch (error) {

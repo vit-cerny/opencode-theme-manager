@@ -64,6 +64,20 @@ positions for a one-level undo, and reports the geometry as JSON with `-Json`.
 In the terminal client you do not need windows at all: `cli.json` `tabs.mode` + `tabs.layout` puts
 several sessions side by side inside one window (panel *6 · Layout & tabs*).
 
+### Realtime, or after restart
+
+| Client | While it is running | After restart |
+|---|---|---|
+| Desktop GUI | **live**: *7 · Desktop app → Apply glass CSS* rewrites the running window's stylesheet instantly (no reload). Needs the one-time `--remote-debugging-port=9222` launch. Switching the *bundled* GUI theme reloads the window once. | the same CSS is kept in `localStorage`, so the look survives; window fill comes from `opencode.settings` |
+| Terminal TUI | Save/Apply writes the theme + `cli.json`; the [CLI settings docs](https://opencode.ai/v2/docs/cli/config) say valid edits reload while the TUI runs (no file watcher in the binary, so a restart is the guaranteed path) | always correct |
+
+Verify both without trusting me:
+
+```powershell
+node --test test/          # 56 tests, incl. UI tests that drive the real manager in headless Chrome
+python tools/ui-e2e.py     # optional, needs pip install playwright: real browser, real clicks, writes docs/ui-check.png
+```
+
 ## The desktop app (the GUI, not the TUI)
 
 If your opencode is the **desktop app** (`@opencode-aidesktop`, `OpenCode.exe`), that app does *not*

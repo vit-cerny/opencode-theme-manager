@@ -545,10 +545,14 @@ const handler = {
     const info = await api("/api/desktop");
     state.desktop = info;
     const app = info.app;
-    const target = info.debug.port ? `${info.debug.port} -> ${info.debug.targets.map((t) => t.url).join(", ")}` : "closed (needs a restart with theming)";
+    const debug = info.debug || {};
+    const probeList = debug.probes || debug.targets || [];
+    const target = debug.port
+      ? `${debug.port} -> ${probeList.map((entry) => `${entry.url}${entry.isApp ? " (app)" : ""}`).join(", ") || "no pages"}`
+      : "closed (needs a restart with theming)";
     $("desktopInfo").innerHTML = app.installed
-      ? `app: <code>${app.exe}</code><br>profile: <code>${app.profile}</code><br>bundled themes: ${info.themeIds.length} · devtools port: ${target}${info.debug.current?.theme ? ` · current GUI theme: <code>${info.debug.current.theme}</code>` : ""}`
-      : `no opencode desktop app found on this machine (looked in ${app.root || "%-LOCALAPPDATA%\\Programs"})`;
+      ? `app: <code>${app.exe}</code><br>profile: <code>${app.profile}</code><br>bundled themes: ${info.themeIds.length} · devtools port: ${target}${debug.current?.theme ? ` · current GUI theme: <code>${debug.current.theme}</code>` : ""}`
+      : `no opencode desktop app found on this machine (looked in ${app.root || "%LOCALAPPDATA%\\Programs"})`;
     const select = $("desktopThemeId");
     if (select.options.length !== info.themeIds.length) {
       select.innerHTML = "";
@@ -562,7 +566,7 @@ const handler = {
     }
   },
   async desktopApplyTheme() {
-    const result = await api("/api/desktop/apply", { themeId: $("desktopThemeId").value, port: state.desktop?.debug?.port || undefined });
+    const result = await api("/api/desktop/apply", { themeId: $("desktopThemeId").value, reload: true, port: state.desktop?.debug?.port || undefined });
     if (result.ok === false) return setStatus(`desktop: ${result.error}. ${result.hint || ""}`, "bad");
     setStatus(`GUI theme set to ${$("desktopThemeId").value} on ${result.target.url}`, "ok");
     await handler.desktopInfo();
@@ -575,8 +579,8 @@ const handler = {
       $("desktopResult").innerHTML = `<b>could not reach the desktop app</b><br>${result.error}<br><code>${result.hint}</code>`;
       return setStatus("desktop: needs a one-time restart with theming", "bad");
     }
-    $("desktopResult").innerHTML = `injected ${css.length} bytes into <code>${result.target.url}</code> · stored keys: ${Object.keys(result.result).filter((k) => k !== "origin").join(", ")}`;
-    setStatus("desktop CSS injected - the window reloads itself", "ok");
+    $("desktopResult").innerHTML = `injected ${css.length} bytes into <code>${result.target.url}</code> · applied live: ${result.result.appliedNow} bytes · stored keys: ${Object.keys(result.result).filter((k) => k !== "origin" && k !== "appliedNow").join(", ")}`;
+    setStatus("desktop CSS applied live - no restart, no reload", "ok");
   },
   async desktopRestart() {
     const result = await api("/api/desktop/restart", { port: state.desktop?.debug?.port || undefined });
