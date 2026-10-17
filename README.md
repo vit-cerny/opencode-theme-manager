@@ -100,6 +100,46 @@ node --test test/          # 62 tests, incl. UI tests that drive the real manage
 python tools/ui-e2e.py     # optional, needs pip install playwright: real browser, real clicks, writes docs/ui-check.png
 ```
 
+## True transparency in the desktop GUI (patch)
+
+Everything else (colours, fonts, radius, translucent panels, window fill) applies through
+`localStorage` + `opencode.settings` with no patching. **Window see-through cannot**: the app creates
+its window without `transparent: true` and without a Mica/acrylic material, so Chromium composites the
+page into an opaque surface. That is a window property, so the app has to be patched:
+
+```powershell
+node tools\patch-desktop.mjs                    # dry run: shows the exact 25 bytes it would change
+node tools\patch-desktop.mjs --apply            # close the app, keep a backup, patch it
+launch-themed.cmd                               # start it with DevTools + push the theme
+node tools\desktop-apply.mjs --glass --wallpaper --restart
+powershell -File tools\desktop-backdrop.ps1 -Backdrop acrylic   # now this can actually work
+node tools\patch-desktop.mjs --revert           # undo (byte-identical restore)
+```
+
+What it changes: one function in the app's main bundle builds the window options
+(`{ title, icon, backgroundColor: Ld ?? cn(), frame:false, titleBarStyle:'hidden', titleBarOverlay, webPreferences }`).
+The tool overwrites the 25 bytes of `backgroundColor:Ld??cn(),` with `transparent:!0,` + padding —
+a **same-length edit inside the archive payload**. The archive is never unpacked or repacked (an
+unpack/repack round trip was measured to drop 72 MB of `node_modules` — that path is not used), the
+header and every other byte stay identical, and the test asserts exactly that plus a byte-identical
+revert. Re-run it after an app update; app updates replace `app.asar`.
+
+Two honest caveats: if the app ships with Electron's asar-integrity validation enabled it may refuse to
+start after patching (`--revert` fixes that instantly), and the wallpaper-painted mode below gets you
+the same look with no patching at all.
+
+## Wallpaper behind the panels (no patching)
+
+`tools/wallpaper.ps1` reads your real desktop wallpaper, resizes it (1600 px, JPEG q70, ~184 KB) and
+the manager can paint it into the app behind the translucent panels — that is how the preview's look is
+achieved without the window being transparent:
+
+```powershell
+node tools\desktop-apply.mjs --glass --wallpaper --backdrop acrylic --restart
+```
+
+or in the UI: **7 · Desktop app (GUI)** → tick *paint my desktop wallpaper behind the panels* → Apply.
+
 ## Transparency: what each client can really do
 
 | Client | Wallpaper see-through | Why |

@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   buildTheme, designToCss, defaultDesign, importV1, resolveHues, resolveTheme, validateTheme, TOKEN_PATHS, ALL_HUES, WEB_CSS_KEYS,
 } from "./lib/schema.mjs";
@@ -453,6 +453,19 @@ const routes = {
       return { ok: true, ...result, cssBytes: css.length };
     } catch (error) {
       return { ok: false, error: error.message, hint: `run: node tools/desktop-apply.mjs --glass --restart (opens --remote-debugging-port=${DEFAULT_DEBUG_PORT})` };
+    }
+  },
+
+  "GET /api/wallpaper": () => {
+    if (process.platform !== "win32") return { ok: false, error: "wallpaper reading is Windows-only so far" };
+    const script = path.join(here, "tools", "wallpaper.ps1");
+    if (!fs.existsSync(script)) return { ok: false, error: "tools/wallpaper.ps1 is missing" };
+    const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Json"], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+    try {
+      const parsed = JSON.parse((result.stdout || "").trim() || "{}");
+      return parsed.ok ? parsed : { ok: false, error: parsed.error || "no wallpaper" };
+    } catch (error) {
+      return { ok: false, error: `could not read the wallpaper: ${error.message}`, stderr: String(result.stderr || "").slice(0, 300) };
     }
   },
 

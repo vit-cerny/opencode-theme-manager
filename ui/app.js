@@ -583,10 +583,20 @@ const handler = {
     await handler.desktopInfo();
   },
   async desktopGlass() {
-    const css = desktopClientCss(state.resolved[state.mode], { ...state.ui, customCss: state.ui.customCss });
-    const light = desktopClientCss(state.resolved.light, { ...state.ui, customCss: state.ui.customCss });
-    // The window fill is opaque by design (the app's window has no transparent/Mica flag), so also
-    // write it into the app's settings file: that is the colour it starts with next time.
+    let wallpaper = null;
+    if ($("desktopWallpaper").checked) {
+      const shot = await api("/api/wallpaper");
+      if (shot.ok) {
+        wallpaper = shot.dataUrl;
+        state.ui.wallpaper = wallpaper;
+      } else setStatus(`wallpaper: ${shot.error}`, "bad");
+    } else {
+      state.ui.wallpaper = null;
+    }
+    const css = desktopClientCss(state.resolved[state.mode], { ...state.ui, wallpaper, customCss: state.ui.customCss });
+    const light = desktopClientCss(state.resolved.light, { ...state.ui, wallpaper, customCss: state.ui.customCss });
+    // The window fill is opaque unless a wallpaper is painted (then it is covered anyway), and the app's
+    // window has no transparent/Mica flag, so also write the fill into its settings file for next start.
     const base = state.resolved[state.mode]["background.base"] || "#101623";
     const opaque = /^#[0-9a-f]{6}[0-9a-f]{2}$/i.test(base) ? base.slice(0, 7) : base;
     const window = await api("/api/desktop/window", { color: opaque });

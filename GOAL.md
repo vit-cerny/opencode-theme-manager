@@ -203,6 +203,52 @@ Performance: the injected stylesheet keeps `backdrop-filter` to dialogs/cards in
 `[data-component]`/`surface-*` element (that broad rule was the expensive one), and skips the in-page
 blur entirely in backdrop mode (the OS already blurs).
 
+## Phase 9: "give me the tool" - two ways to get the look
+
+objective: the user ran the backdrop experiment, it was still not transparent, and asked for the tool or a proper reverse engineering.
+
+Findings, all from the app's own bundle:
+
+```js
+function Rd(e,t){ let n=kr(); return { title:`OpenCode`, icon:Xd(e,t), backgroundColor:Ld??cn(),
+  ...(win32 ? { frame:!1, titleBarStyle:`hidden`, titleBarOverlay:Zd({mode:n}) } : {}),
+  webPreferences:{ preload:t.preloadPath, contextIsolation:!0, nodeIntegration:!1, sandbox:!0 } } }
+```
+
+`transparent` and `backgroundMaterial` are simply absent, so the window is opaque at the OS level and no
+runtime trick can change that (measured: accent/DWM backdrop = pixel-identical `none` vs `acrylic`).
+
+Delivered instead:
+
+1. **Wallpaper-behind mode (no patching, works now).** `tools/wallpaper.ps1` reads the real wallpaper
+   (`HKCU:\Control Panel\Desktop\WallPaper`), resizes it to 1600 px JPEG q70 -> 184 KB data URL, and the
+   stylesheet paints it behind the translucent panels (`html::before`, `z-index:-1`). One composited
+   layer, one image, no per-frame cost. `--wallpaper` on the tool, a checkbox in panel 7.
+2. **A real patcher for true transparency.** `tools/patch-desktop.mjs` overwrites the 25 bytes of
+   `backgroundColor:Ld??cn(),` in the main bundle with `transparent:!0,` + padding - a **same-length
+   edit inside the asar payload**. Dry-run by default, `--apply`, `--revert`.
+
+Why same-length bytes instead of unpack/repack: the first implementation used `@electron/asar`
+extract+pack and produced a 95.5 MB archive from a 167.7 MB tree. Investigation showed the listing was
+identical (9329 entries both) but the sidecar `app.asar.unpacked` is incomplete (extract fails on
+`node-pty-win32-x64/LICENSE`) and `--unpack-dir node_modules` would have kept ~72 MB of JS out of the
+archive, i.e. a broken app. Abandoned that path; the byte patch cannot lose anything because nothing is
+re-encoded.
+
+Verified on a copy of the real 168.1 MB archive:
+
+```
+dry run : anchor 1 occurrence @78666658, before "...backgroundColor:Ld??cn(),..." after "...transparent:!0,          ..."
+apply   : written "transparent:!0,          " | size unchanged | header identical
+revert  : byte-identical (sha256 match against the pre-patch copy)
+```
+
+Both are covered by tests (`test/desktop.test.mjs`: patcher dry-run/apply/revert on a temp copy, plus the
+wallpaper CSS rules). Suite: 64 tests, 63 pass, 1 skipped (live-app test needs the port).
+
+Residual risks, stated: an app update replaces `app.asar` (re-run the tool); if the app enables Electron's
+asar-integrity validation it may refuse to start (one `--revert` fixes it).
+
 status: done
 
 

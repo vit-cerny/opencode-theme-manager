@@ -131,6 +131,11 @@ test("generated CSS drives the desktop app's own variable names", () => {
   assert.match(backdropCss, /--background-base: transparent !important;/);
   assert.equal(/backdrop-filter:\s*blur/.test(backdropCss), false, "no in-page blur when the OS does it");
   assert.match(desktopCss(resolved, {}), /backdrop-filter: blur\(18px\)/, "default keeps the container-level blur");
+  // Wallpaper mode: the image is painted into the page (the app's window itself is opaque).
+  const walled = desktopCss(resolved, { wallpaper: "data:image/jpeg;base64,AAAA" });
+  assert.match(walled, /html::before \{ content: ""; position: fixed/);
+  assert.match(walled, /background-image: url\("data:image\/jpeg;base64,AAAA"\)/);
+  assert.equal(desktopCss(resolved, { wallpaper: "https://example.com/x.jpg" }).includes("html::before"), false, "only data URLs are accepted");
 });
 
 test("CDP round-trip: refuses a foreign page, then injects into the app page", async (t) => {
@@ -197,6 +202,43 @@ test("the desktop app's real surface variables are what we write", async (t) => 
   const missing = required.filter((name) => !defined.has(name));
   assert.deepEqual(missing, [], `the app no longer defines: ${missing.join(", ")}`);
   t.diagnostic(`${defined.size} variables defined by the app; all ${required.length} names we write exist (${target.url})`);
+});
+
+test("the desktop patcher edits 25 bytes in place and reverts byte-identically", async (t) => {
+  const app = findDesktopApp();
+  if (!app.asar) {
+    t.skip("desktop app not installed");
+    return;
+  }
+  const { createHash } = await import("node:crypto");
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "octm-patch-test-"));
+  const copy = path.join(work, "app.asar");
+  const script = path.join(repo, "tools", "patch-desktop.mjs");
+  try {
+    fs.copyFileSync(app.asar, copy);
+    const hash = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+    const original = hash(copy);
+
+    const dry = spawnSync(process.execPath, [script, "--target", copy], { encoding: "utf8" });
+    assert.equal(hash(copy), original, "dry run must not write");
+    assert.match(dry.stdout, /DRY RUN/);
+    assert.match(dry.stdout, /transparent:!0,/);
+
+    const applied = spawnSync(process.execPath, [script, "--target", copy, "--apply"], { encoding: "utf8" });
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+    assert.equal(fs.statSync(copy).size, fs.statSync(app.asar).size, "size unchanged (payload-only edit)");
+    const patched = fs.readFileSync(copy);
+    assert.ok(patched.includes("transparent:!0,"), "flag is in the archive");
+    assert.equal(patched.includes("backgroundColor:Ld??cn(),"), false, "anchor replaced");
+    assert.deepEqual(patched.slice(0, 16), fs.readFileSync(app.asar).slice(0, 16), "archive header untouched");
+
+    const reverted = spawnSync(process.execPath, [script, "--target", copy, "--revert"], { encoding: "utf8" });
+    assert.equal(reverted.status, 0, reverted.stdout + reverted.stderr);
+    assert.equal(hash(copy), original, "revert is byte-identical");
+    t.diagnostic(`patched and reverted ${(fs.statSync(copy).size / 1024 / 1024).toFixed(0)} MB archive on a copy; the installed app was never touched`);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
 });
 
 test("a closed debug port fails with an actionable message", async () => {

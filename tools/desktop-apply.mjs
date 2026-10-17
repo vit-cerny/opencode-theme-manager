@@ -83,6 +83,21 @@ if (has("--restart")) {
 
 let css = "";
 let backdrop = arg("--backdrop");            // none | blur | acrylic | mica | tabbed
+let wallpaper = null;
+if (has("--wallpaper")) {
+  // The app's window is opaque, so the desktop can only be seen behind the panels if the wallpaper is
+  // painted into the page. tools/wallpaper.ps1 reads the real one and shrinks it to a data URL.
+  const shot = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "wallpaper.ps1"), "-Json"], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  try {
+    const parsed = JSON.parse((shot.stdout || "").trim() || "{}");
+    if (parsed.ok) {
+      wallpaper = parsed.dataUrl;
+      console.log(`wallpaper: ${parsed.path} -> ${parsed.width}x${parsed.height}, ${Math.round(parsed.bytes / 1024)} KB`);
+    } else console.log(`wallpaper: ${parsed.error || "not found"}`);
+  } catch (error) {
+    console.log(`wallpaper: could not read it (${error.message})`);
+  }
+}
 if (has("--css")) {
   css = fs.readFileSync(path.resolve(repo, arg("--css")), "utf8");
 } else if (has("--glass")) {
@@ -90,7 +105,7 @@ if (has("--css")) {
   const bundle = interpretPrompt(prompt);
   const theme = buildTheme(bundle.design);
   const resolved = { dark: resolveTheme(theme, "dark"), light: resolveTheme(theme, "light") };
-  const ui = { ...bundle.ui, backdrop };
+  const ui = { ...bundle.ui, backdrop, wallpaper };
   css = desktopCss(resolved.dark, ui);
   const light = desktopCss(resolved.light, ui);
   const themeId = arg("--theme-id", themeIds.includes("nord") ? "nord" : null);
