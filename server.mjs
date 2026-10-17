@@ -28,6 +28,10 @@ const flag = (name, fallback = null) => {
 const PORT = Number(flag("--port", process.env.OC_THEME_PORT || 4289));
 const openBrowser = !args.includes("--no-open");
 const home = os.homedir();
+// Redirect the desktop app's profile (settings + theme ids) - tests use it so they never write into
+// a real user's app state.
+const desktopProfile = flag("--desktop-profile");
+if (desktopProfile) process.env.OPENCODE_DESKTOP_PROFILE = desktopProfile;
 
 function resolveConfigDir() {
   const explicit = flag("--config-dir");
@@ -450,6 +454,17 @@ const routes = {
     } catch (error) {
       return { ok: false, error: error.message, hint: `run: node tools/desktop-apply.mjs --glass --restart (opens --remote-debugging-port=${DEFAULT_DEBUG_PORT})` };
     }
+  },
+
+  "POST /api/desktop/window": (body) => {
+    const app = findDesktopApp();
+    if (!app.settingsFile) return { ok: false, error: "desktop app settings file not found" };
+    const color = String(body.color || "").trim();
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return { ok: false, error: "expected an opaque #rrggbb window colour" };
+    const settings = readJson(app.settingsFile) || {};
+    settings.backgroundColor = color;
+    const written = writeJsonWithBackup(app.settingsFile, settings);
+    return { ok: true, ...written, backgroundColor: color, note: "the app also syncs this while it runs, via --background-base" };
   },
 
   "POST /api/desktop/clear": async (body) => {

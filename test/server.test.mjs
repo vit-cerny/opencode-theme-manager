@@ -50,7 +50,7 @@ before(async () => {
   fs.mkdirSync(path.join(configDir, "themes"), { recursive: true });
   fs.writeFileSync(path.join(configDir, "cli.json"), JSON.stringify({ $schema: "https://opencode.ai/v2/cli.json", theme: { name: "system" }, mouse: false }, null, 2));
   terminalFile = path.join(configDir, "wt-settings.json");
-  fs.writeFileSync(terminalFile, JSON.stringify({ profiles: { defaults: { font: { face: "Cascadia Mono", size: 11 }, opacity: 90, useAcrylic: true }, list: [{ guid: "{abc}", name: "PowerShell" }] } }, null, 2));  child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", configDir, "--terminal-settings", terminalFile], { cwd: repo });
+  fs.writeFileSync(terminalFile, JSON.stringify({ profiles: { defaults: { font: { face: "Cascadia Mono", size: 11 }, opacity: 90, useAcrylic: true }, list: [{ guid: "{abc}", name: "PowerShell" }] } }, null, 2));  child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", configDir, "--terminal-settings", terminalFile, "--desktop-profile", path.join(configDir, "appdata")], { cwd: repo });
   const port = await waitForPort(child);
   base = `http://127.0.0.1:${port}`;
 });

@@ -43,12 +43,12 @@ test("tiler snaps windows into a grid, touches only the named process, and resto
   ];
   try {
     let before = [];
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 80; attempt++) {
       before = listWindows();
       if (before.length >= 2) break;
       await sleep(250);
     }
-    assert.ok(before.length >= 2, `expected two fixture windows, saw ${before.length}`);
+    assert.ok(before.length >= 2, `expected two fixture windows within 20s, saw ${before.length} (PowerShell startup is slow under load)`);
     const original = before.slice(0, 2);
 
     const tiled = runTile(["-ProcessName", processName, "-Layout", "2x1", "-Padding", String(padding), "-Json", "-StateFile", stateFile]);

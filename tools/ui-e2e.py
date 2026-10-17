@@ -42,7 +42,7 @@ def check(ok: bool, label: str, extra: str = "") -> None:
 def main() -> int:
     profile = tempfile.mkdtemp(prefix="octm-pw-")
     server = subprocess.Popen(
-        ["node", "server.mjs", "--port", "0", "--no-open", "--config-dir", str(Path(profile) / "cfg")],
+        ["node", "server.mjs", "--port", "0", "--no-open", "--config-dir", str(Path(profile) / "cfg"), "--desktop-profile", str(Path(profile) / "appdata")],
         cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
     port = None
@@ -94,6 +94,15 @@ def main() -> int:
             page.click("summary:has-text('Desktop app')")
             page.wait_for_function("() => /bundled themes/.test(document.getElementById('desktopInfo').textContent)")
             check("bundled themes" in (page.text_content("#desktopInfo") or ""), "desktop panel reports the app")
+
+            # The preview must not promise the GUI what its window cannot do (no transparent/Mica flag).
+            page.click(".tab[data-view='desktop']")
+            page.wait_for_function("() => /no wallpaper can show through/i.test(document.getElementById('stageNote').textContent)")
+            flat = page.evaluate("getComputedStyle(document.getElementById('wallpaper')).backgroundImage")
+            check(flat == "none", "desktop preview drops the wallpaper it cannot have", flat[:24])
+            page.click(".tab[data-view='tui']")
+            page.wait_for_function("() => /terminal compositor/i.test(document.getElementById('stageNote').textContent)")
+            check(True, "CLI preview says where its see-through comes from")
 
             before = page.evaluate("getComputedStyle(document.getElementById('tui')).getPropertyValue('--oc-bg')")
             page.fill("#prompt", "nord blue frosted glass rounded corners jetbrains mono 60% transparent")

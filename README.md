@@ -159,11 +159,16 @@ The injection refuses to touch anything that is not the app: a candidate page is
 its preload has set `data-theme` on `<html>` (or the theme id is already stored), so a browser tab
 that happens to expose a debug port is left alone.
 
-**What the GUI can and cannot do.** Colours, fonts, radius and translucency *inside* the window are
-CSS, so they work. True wallpaper see-through needs a transparent window, which the app does not
-expose; the closest honest equivalent is a translucent surface stack over a dark base. The app also
-reads `backgroundColor` from `%APPDATA%\ai.opencode.desktop\opencode.settings` for its window fill -
-that one is a plain file, no DevTools needed.
+**What the GUI can and cannot do.** Colours, fonts, radius and translucency *inside* the window work.
+True wallpaper see-through does **not**: the app creates its window without `transparent: true` and
+without Mica/acrylic (checked in its bundle: `{ title, icon, backgroundColor, frame:!1, titleBarStyle:
+"hidden", titleBarOverlay, webPreferences }` - no `transparent`, no `backgroundMaterial`, no `vibrancy`
+anywhere in 168 MB), so Windows ignores alpha on the window fill. The manager therefore writes an
+**opaque** window colour (`--background-base`, which the app syncs to its window) and keeps the alpha
+on the surfaces painted on top. The preview reflects exactly that: the desktop view drops the
+wallpaper and shows the real window fill with a caption; the CLI view keeps the wallpaper because
+there the see-through is real (your terminal compositor). The app also reads `backgroundColor` from
+`%APPDATA%\ai.opencode.desktop\opencode.settings` for its window fill - a plain file, no DevTools needed.
 
 ### "I applied it but opencode looks the same"
 

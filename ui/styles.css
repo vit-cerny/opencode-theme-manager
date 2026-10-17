@@ -170,6 +170,8 @@ button.mini:disabled { opacity: .3; cursor: default; }
   pointer-events: none;
 }
 .wallpaper.dragging { outline: 2px dashed #ffffff66; outline-offset: -8px; }
+.wallpaper.no-wallpaper::after { display: none; }
+.stage-note { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 3; font-size: 11px; line-height: 1.4; color: #eef2ffcc; background: #00000073; border: 1px solid #ffffff24; border-radius: 8px; padding: 5px 8px; backdrop-filter: blur(6px); }
 
 .tui {
   --oc-bg: #101623cc;

@@ -95,6 +95,17 @@ function applyPreview() {
   };
   for (const [key, value] of Object.entries(vars)) tui.style.setProperty(key, value);
   tui.classList.toggle("desktop", state.view === "desktop");
+  // The desktop GUI's window is created without transparent:true and without Mica/acrylic (verified
+  // in its bundle), so the wallpaper cannot show through it. The preview shows what it can do: the
+  // app's own opaque window fill with translucent surfaces on top. The TUI really can be see-through.
+  const wallpaper = $("wallpaper");
+  const desktopView = state.view === "desktop";
+  const base = colors["background.base"] || "";
+  wallpaper.classList.toggle("no-wallpaper", desktopView);
+  wallpaper.style.background = desktopView ? (/^#[0-9a-f]{6}[0-9a-f]{2}$/i.test(base) ? base.slice(0, 7) : base) : "";
+  $("stageNote").innerHTML = desktopView
+    ? "Desktop GUI preview: its window has no <code>transparent</code>/Mica flag, so no wallpaper can show through - solid window fill plus translucent surfaces, which is what you get."
+    : "CLI / TUI preview: the see-through here is real, it comes from your terminal compositor (Windows Terminal opacity/acrylic).";
   $("tuiTabs").style.display = state.layout["tabs.mode"] === "off" ? "none" : "";
   $("tuiSidebar").style.display = state.layout["session.sidebar"] === "hide" ? "none" : "";
 
@@ -574,12 +585,17 @@ const handler = {
   async desktopGlass() {
     const css = desktopClientCss(state.resolved[state.mode], { ...state.ui, customCss: state.ui.customCss });
     const light = desktopClientCss(state.resolved.light, { ...state.ui, customCss: state.ui.customCss });
+    // The window fill is opaque by design (the app's window has no transparent/Mica flag), so also
+    // write it into the app's settings file: that is the colour it starts with next time.
+    const base = state.resolved[state.mode]["background.base"] || "#101623";
+    const opaque = /^#[0-9a-f]{6}[0-9a-f]{2}$/i.test(base) ? base.slice(0, 7) : base;
+    const window = await api("/api/desktop/window", { color: opaque });
     const result = await api("/api/desktop/apply", { css, light, themeId: $("desktopThemeId").value || null, port: state.desktop?.debug?.port || undefined });
     if (result.ok === false) {
       $("desktopResult").innerHTML = `<b>could not reach the desktop app</b><br>${result.error}<br><code>${result.hint}</code>`;
       return setStatus("desktop: needs a one-time restart with theming", "bad");
     }
-    $("desktopResult").innerHTML = `injected ${css.length} bytes into <code>${result.target.url}</code> · applied live: ${result.result.appliedNow} bytes · stored keys: ${Object.keys(result.result).filter((k) => k !== "origin" && k !== "appliedNow").join(", ")}`;
+    $("desktopResult").innerHTML = `injected ${css.length} bytes into <code>${result.target.url}</code> · applied live: ${result.result.appliedNow} bytes · window fill <code>${opaque}</code>${window.path ? ` written to <code>${window.path}</code>` : ""}`;
     setStatus("desktop CSS applied live - no restart, no reload", "ok");
   },
   async desktopRestart() {

@@ -46,7 +46,7 @@ const waitFor = (target, expression, timeoutMs = 20_000) => new Promise((resolve
 
 before(async () => {
   profile = fs.mkdtempSync(path.join(os.tmpdir(), "octm-ui-"));
-  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config")], { cwd: repo });
+  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config"), "--desktop-profile", path.join(profile, "appdata")], { cwd: repo });
   const port = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("server did not start")), 15_000);
     let buffer = "";

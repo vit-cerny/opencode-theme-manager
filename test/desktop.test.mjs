@@ -116,7 +116,10 @@ test("generated CSS drives the desktop app's own variable names", () => {
   for (const variable of ["--background-base", "--surface-base", "--surface-raised-base", "--text-base", "--text-weak", "--icon-base", "--border-base", "--success-bg", "--error-text", "--border-radius"]) {
     assert.ok(css.includes(variable), `css sets ${variable}`);
   }
-  assert.match(css, /--background-base: #10162380 !important;/);
+  // The window fill must be opaque (no transparent/Mica flag in the app's window options) while the
+  // surfaces on top keep their alpha - that is the difference between "themed" and "looks unchanged".
+  assert.match(css, /--background-base: #101623 !important;/);
+  assert.match(css, /--surface-raised-base: #171d29a6 !important;/);
   assert.match(css, /--surface-raised-stronger: #232c3e !important;/);
   assert.match(css, /--border-radius: 14px !important;/);
   assert.match(css, /--v2-font-family-code: "JetBrains Mono", ui-monospace, monospace !important;/);
@@ -171,11 +174,11 @@ test("the desktop app's real surface variables are what we write", async (t) => 
   // Read-only against the live app when it is running with a debug port: proves the names in
   // lib/schema.mjs#desktopClientCss are the ones the app actually defines.
   const found = await findDebugPort([DEFAULT_DEBUG_PORT]);
-  if (!found) {
-    t.skip("desktop app is not listening on 9222 (start it with tools/desktop-apply.mjs --glass --restart)");
+  const target = found?.targets.find((candidate) => candidate.url.startsWith("oc:"));
+  if (!target) {
+    t.skip("no opencode app page on 9222 (run tools/desktop-apply.mjs --glass --restart; a stand-in browser on the same port is not the app)");
     return;
   }
-  const target = found.targets.find((candidate) => candidate.url.startsWith("oc:")) || found.targets[0];
   const names = await cdpEvaluate(target.ws, `(() => {
     const out = new Set();
     for (const sheet of document.styleSheets) {

@@ -132,6 +132,36 @@ CHANGED: background, surface, raised, text, border, radius      injected: 2406 b
 Screenshot of the themed window: `docs/desktop-app-after.png`. Tests: `node --test test/` -> 63 tests,
 62 pass, 1 skipped (the UI stand-in for the app is skipped while the real app holds port 9222).
 
+## Phase 7: the GUI cannot look like my mock (corrected)
+
+objective: "my opencode doesnt look like it says in the manager website" - the preview promised wallpaper glass the app cannot do.
+
+Evidence, from the app's own bundle:
+
+```js
+function Rd(e,t){ let n=kr(); return { title:`OpenCode`, icon:Xd(e,t), backgroundColor:Ld??cn(),
+  ...(win32 ? { frame:!1, titleBarStyle:`hidden`, titleBarOverlay:Zd({mode:n}) } : {}),
+  webPreferences:{ preload:t.preloadPath, contextIsolation:!0, nodeIntegration:!1, sandbox:!0 } } }
+```
+
+No `transparent: true`, no `backgroundMaterial` (Mica/acrylic), no `vibrancy` anywhere in the 168 MB
+bundle. Windows therefore ignores alpha on the window fill, and the wallpaper can never show through
+the desktop app. The same bundle also shows the app syncing its window fill from CSS
+(`getComputedStyle(document.documentElement).getPropertyValue('--background-base')` -> `api.setBackgroundColor(t)`),
+which is why an alpha `--background-base` produced a muddy, unchanged-looking window.
+
+Fixes:
+- `desktopClientCss()` emits an **opaque** `--background-base` (the window fill) while the surfaces
+  on top keep their alpha - so the window is a real theme colour with translucent panels over it.
+- The preview is now honest: in the Desktop view the wallpaper is dropped and the stage uses the
+  app's real window fill, with a caption; the CLI view keeps the wallpaper because there it is real.
+- New `POST /api/desktop/window` writes the window fill into `opencode.settings` (with backup).
+- Found and fixed a real leak while doing this: the UI tests were writing that window colour into the
+  user's real `opencode.settings`. `findDesktopApp()` now honours `OPENCODE_DESKTOP_PROFILE` /
+  `--desktop-profile`, and every test spawns with it pointing at a temp dir. The user's value was
+  restored (`#0d0221` -> `#101623`, backup kept).
+- Also hardened a flaky tiler test (PowerShell window startup can exceed 10 s under load).
+
 status: done
 
 
