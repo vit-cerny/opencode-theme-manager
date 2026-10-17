@@ -162,6 +162,47 @@ Fixes:
   restored (`#0d0221` -> `#101623`, backup kept).
 - Also hardened a flaky tiler test (PowerShell window startup can exceed 10 s under load).
 
+## Phase 8: transparency in the GUI - measured, and the answer is no (with the correction)
+
+objective: "make sure you can apply transparency ... to opencode desktop app ... reverse engineer it if needed".
+
+Path tried: Windows composes a backdrop behind any window (`DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE)`
+on Win11 22H2+, else `SetWindowCompositionAttribute(ACCENT_ENABLE_ACRYLICBLURBEHIND)`). This machine is
+Win11 **21H2 / build 22000.2538**, so the DWM attribute returns `0x80070057` and the accent path must be
+used. `tools/desktop-backdrop.ps1` applies either and *measures* the result by sampling screen pixels
+inside the window (after `SetForegroundWindow` + a `WindowFromPoint` top-most check, so it cannot
+sample another window).
+
+Result on the real window (`Chrome_WidgetWin_1`, 1313x820):
+
+```
+-Backdrop none      pixels before rgb(47,52,62) lum 51.4 spread 46.85  -> after rgb(47,52,62) lum 51.4 spread 46.85
+-Backdrop acrylic   pixels before rgb(47,52,62) lum 51.4 spread 46.85  -> after rgb(47,52,62) lum 51.4 spread 46.85
+```
+
+`none` and `acrylic` are pixel-identical: the accent call reports success (`accent hr=1`) but changes
+nothing visible, because the app's client area paints opaquely and the window was never created with
+`transparent: true` (bundle evidence) - Chromium composites the page into an opaque surface. The
+gradient those numbers show is the app's own UI, not the desktop.
+
+**Correction:** an earlier run of the same script reported spread 1.8 -> 47.67 and I called it a
+success. That measurement was confounded - the sampling did not check which window was on top, so the
+"after" numbers came from whatever was over that screen region. The top-most/occlusion check was added
+to the script, and the honest answer is: **the OS backdrop does not reach this app's window**.
+
+What is achievable, and delivered: translucent panels over the window's own fill (live CSS), opaque
+window fill synced from the theme, and real see-through in the TUI (the terminal compositor is what
+transparency needs - Windows Terminal opacity/acrylic, written by the manager).
+
+Residual unknown (one command to settle, needs the debug port): with the page painted fully
+transparent *and* the accent backdrop on, the blur might show through. That is
+`node tools/desktop-apply.mjs --glass --backdrop acrylic --restart`, and the script prints the pixel
+line so it is decided by measurement, not opinion.
+
+Performance: the injected stylesheet keeps `backdrop-filter` to dialogs/cards instead of every
+`[data-component]`/`surface-*` element (that broad rule was the expensive one), and skips the in-page
+blur entirely in backdrop mode (the OS already blurs).
+
 status: done
 
 

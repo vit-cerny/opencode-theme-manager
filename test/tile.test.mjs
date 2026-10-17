@@ -7,14 +7,14 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // The tiler is Windows-only Win32 code, so the check drives the real script against two throwaway
-// windows (test/fixtures/window.ps1): it verifies the grid geometry, that only the named process is
+// windows (test/fixtures/window.py): it verifies the grid geometry, that only the named process is
 // touched, and that -Restore puts the windows back. If windows for that process already exist we
 // skip instead of moving somebody else's window.
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const script = path.join(repo, "tools", "tile.ps1");
-const fixture = path.join(repo, "test", "fixtures", "window.ps1");
-const processName = "powershell";
+const fixture = path.join(repo, "test", "fixtures", "window.py");
+const processName = "python";
 const stateFile = path.join(os.tmpdir(), `octm-tile-state-${process.pid}.json`);
 const padding = 12;
 
@@ -38,8 +38,8 @@ test("tiler snaps windows into a grid, touches only the named process, and resto
   }
 
   const spawned = [
-    spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", fixture, "-Title", "octm tile A"], { stdio: "ignore" }),
-    spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", fixture, "-Title", "octm tile B"], { stdio: "ignore" }),
+    spawn("python", [fixture, "octm tile A"], { stdio: "ignore" }),
+    spawn("python", [fixture, "octm tile B"], { stdio: "ignore" }),
   ];
   try {
     let before = [];

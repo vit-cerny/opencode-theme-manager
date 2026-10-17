@@ -126,6 +126,11 @@ test("generated CSS drives the desktop app's own variable names", () => {
   assert.match(css, /backdrop-filter: blur\(20px\)/);
   assert.ok(css.includes("/* user block */"), "custom css is appended last");
   assert.equal(desktopCss(resolved, {}).includes("--v2-font-family-code: var(--v2-font-family-code);"), true, "no font requested keeps the app's own font");
+  // Backdrop mode: window layer transparent (so the OS blur could show) and no in-page blur at all.
+  const backdropCss = desktopCss(resolved, { backdrop: "acrylic", monoFont: "JetBrains Mono", blur: 20 });
+  assert.match(backdropCss, /--background-base: transparent !important;/);
+  assert.equal(/backdrop-filter:\s*blur/.test(backdropCss), false, "no in-page blur when the OS does it");
+  assert.match(desktopCss(resolved, {}), /backdrop-filter: blur\(18px\)/, "default keeps the container-level blur");
 });
 
 test("CDP round-trip: refuses a foreign page, then injects into the app page", async (t) => {

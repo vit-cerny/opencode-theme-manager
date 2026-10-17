@@ -13,6 +13,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildTheme, resolveTheme } from "../lib/schema.mjs";
 import { interpretPrompt } from "../lib/designer.mjs";
@@ -81,6 +82,7 @@ if (has("--restart")) {
 }
 
 let css = "";
+let backdrop = arg("--backdrop");            // none | blur | acrylic | mica | tabbed
 if (has("--css")) {
   css = fs.readFileSync(path.resolve(repo, arg("--css")), "utf8");
 } else if (has("--glass")) {
@@ -88,8 +90,9 @@ if (has("--css")) {
   const bundle = interpretPrompt(prompt);
   const theme = buildTheme(bundle.design);
   const resolved = { dark: resolveTheme(theme, "dark"), light: resolveTheme(theme, "light") };
-  css = desktopCss(resolved.dark, bundle.ui);
-  const light = desktopCss(resolved.light, bundle.ui);
+  const ui = { ...bundle.ui, backdrop };
+  css = desktopCss(resolved.dark, ui);
+  const light = desktopCss(resolved.light, ui);
   const themeId = arg("--theme-id", themeIds.includes("nord") ? "nord" : null);
   const result = await applyToDesktop({ css, light, themeId, port, reload: false });
   console.log(`\nprompt:    ${prompt}`);
@@ -97,6 +100,8 @@ if (has("--css")) {
   console.log(`target:    ${result.target.title || "(untitled)"}`);
   console.log(`stored:    ${JSON.stringify(result.result)}`);
   console.log(`windows:   ${result.applied.length} app window(s) updated live (no reload)`);
+  if (backdrop) console.log(`backdrop:  ${backdrop} (window layer set to transparent in the CSS)`);
+  console.log("\nthe window reloads itself; if it still looks stock, reload it manually (Ctrl+R).");
   process.exit(0);
 }
 
@@ -112,4 +117,18 @@ if (themeId) {
   process.exit(0);
 }
 
-console.log("\nnothing selected: pass --theme-id <id> or --glass (optionally --restart).");
+if (backdrop) {
+  if (process.platform !== "win32") {
+    console.error("\nwindow backdrops are Windows-only");
+    process.exit(1);
+  }
+  console.log(`\napplying window backdrop: ${backdrop}`);
+  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "desktop-backdrop.ps1"), "-Backdrop", backdrop], { encoding: "utf8" });
+  console.log((result.stdout || "").trim() || (result.stderr || "").trim());
+  console.log("\nread the pixel line: if 'spread' does not change between before and after, the OS");
+  console.log("blur is not reaching this window (its client area paints opaquely) - see the notes in");
+  console.log("docs/opencode-client-re.md. Run with --glass --backdrop <mode> so the page also goes transparent.");
+  process.exit(0);
+}
+
+console.log("\nnothing selected: pass --theme-id <id> or --glass (optionally --restart, --backdrop acrylic).");

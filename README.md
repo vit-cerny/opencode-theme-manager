@@ -100,6 +100,24 @@ node --test test/          # 62 tests, incl. UI tests that drive the real manage
 python tools/ui-e2e.py     # optional, needs pip install playwright: real browser, real clicks, writes docs/ui-check.png
 ```
 
+## Transparency: what each client can really do
+
+| Client | Wallpaper see-through | Why |
+|---|---|---|
+| Terminal TUI | **yes** | the terminal compositor does it: Windows Terminal `opacity` + `useAcrylic` (panel 4 writes both) |
+| Desktop GUI (panels) | **partly** | the panels carry alpha, but what shows through is the window's own fill - so the manager writes that fill opaque (an alpha window fill is ignored and looks muddy) |
+| Desktop GUI (window itself) | **no** | its window is created without `transparent: true` and without Mica/acrylic (checked in the bundle), so Chromium composites the page into an opaque surface. Measured: with the window on top and unoccluded, `--backdrop none` and `--backdrop acrylic` give pixel-identical results (`rgb(47,52,62)` spread 46.85), i.e. the OS blur never reaches it |
+
+`tools/desktop-backdrop.ps1` still exists, because it applies and *measures* the OS backdrop
+(`DwmSetWindowAttribute` on Win11 22H2+, `SetWindowCompositionAttribute` acrylic below that) and
+reports pixel statistics before/after - it just cannot make this window see-through, and it says so
+instead of pretending. One command to re-check on your machine after an app update, with the page also
+made transparent:
+
+```powershell
+node tools\desktop-apply.mjs --glass --backdrop acrylic --restart
+```
+
 ## The desktop app (the GUI, not the TUI)
 
 If your opencode is the **desktop app** (`@opencode-aidesktop`, `OpenCode.exe`), that app does *not*
@@ -169,6 +187,17 @@ on the surfaces painted on top. The preview reflects exactly that: the desktop v
 wallpaper and shows the real window fill with a caption; the CLI view keeps the wallpaper because
 there the see-through is real (your terminal compositor). The app also reads `backgroundColor` from
 `%APPDATA%\ai.opencode.desktop\opencode.settings` for its window fill - a plain file, no DevTools needed.
+
+### "How do I apply it, every time?"
+
+```powershell
+.\launch-themed.cmd        # start the app with DevTools + push the current theme to it
+```
+
+The colours, fonts, radius and translucency are already in the app's `localStorage`, so they survive
+restarts on their own. The launcher adds the step that needs the DevTools port: re-pushing the CSS
+(that is how you change the look without closing the app). Pin the Desktop/Start-menu shortcut to
+`launch-themed.cmd` if you want the app always started themed.
 
 ### "I applied it but opencode looks the same"
 
