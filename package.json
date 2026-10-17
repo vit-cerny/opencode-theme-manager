@@ -1,29 +1,37 @@
 {
-  "name": "@opencode/desktop",
-  "private": true,
-  "version": "2.0.28",
+  "name": "opencode-theme-manager",
+  "version": "0.1.0",
+  "description": "Prompt- or image-driven theme manager for opencode: V2 themes, transparency, fonts, layout, CSS. Zero dependencies.",
   "type": "module",
+  "bin": {
+    "opencode-theme-manager": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/",
+    "check": "node tools/check.mjs",
+    "smoke": "node tools/serve-smoke.mjs",
+    "apply": "node tools/apply.mjs",
+    "examples": "node tools/make-examples.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "lib",
+    "ui",
+    "presets",
+    "examples",
+    "tools",
+    "docs",
+    "start.cmd",
+    "install.ps1",
+    "uninstall.ps1",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["opencode", "theme", "tui", "glassmorphism", "terminal", "transparency"],
   "license": "MIT",
-  "homepage": "https://opencode.ai",
-  "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
-  },
-  "main": "./out/main/index.js",
-  "dependencies": {
-    "@zip.js/zip.js": "2.7.62",
-    "electron-context-menu": "5.0.0",
-    "electron-log": "^5",
-    "electron-updater": "6.8.9",
-    "lighthouse": "13.4.1"
-  },
-  "optionalDependencies": {
-    "@lydell/node-pty-darwin-arm64": "1.2.0-beta.12",
-    "@lydell/node-pty-darwin-x64": "1.2.0-beta.12",
-    "@lydell/node-pty-linux-arm64": "1.2.0-beta.12",
-    "@lydell/node-pty-linux-x64": "1.2.0-beta.12",
-    "@lydell/node-pty-win32-arm64": "1.2.0-beta.12",
-    "@lydell/node-pty-win32-x64": "1.2.0-beta.12"
-  },
-  "desktopName": "ai.opencode.desktop.desktop"
+  "private": false
 }
