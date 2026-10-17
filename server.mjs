@@ -15,7 +15,7 @@ import {
 } from "./lib/schema.mjs";
 import { designFromInput, interpretPrompt, paletteFromThemeSeed, paletteToDesign } from "./lib/designer.mjs";
 import {
-  DEFAULT_DEBUG_PORT, applyToDesktop, bundledThemeIds, clearDesktop, desktopCss, findDesktopApp, findDebugPort, launchDesktopWithDebugging, probeTarget,
+  DEFAULT_DEBUG_PORT, applyToDesktop, bundledThemeIds, clearDesktop, desktopCss, findDesktopApp, findDebugPort, probeTarget, relaunchDesktopWithDebugging,
 } from "./lib/desktop.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -461,13 +461,11 @@ const routes = {
     }
   },
 
-  "POST /api/desktop/restart": (body) => {
-    try {
-      const launched = launchDesktopWithDebugging({ port: Number(body.port) || DEFAULT_DEBUG_PORT, kill: true });
-      return { ok: true, ...launched, note: "the app was closed and is starting again with DevTools enabled; wait a few seconds, then apply" };
-    } catch (error) {
-      return { ok: false, error: error.message };
-    }
+  "POST /api/desktop/restart": async (body) => {
+    const result = await relaunchDesktopWithDebugging({ port: Number(body.port) || DEFAULT_DEBUG_PORT });
+    return result.ok
+      ? { ...result, note: "the app was closed and is starting again with DevTools on; wait a few seconds, then apply" }
+      : result;
   },
 
   "POST /api/profile": (body) => {

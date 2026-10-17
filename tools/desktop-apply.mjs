@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { buildTheme, resolveTheme } from "../lib/schema.mjs";
 import { interpretPrompt } from "../lib/designer.mjs";
 import {
-  DEFAULT_DEBUG_PORT, applyToDesktop, bundledThemeIds, clearDesktop, desktopCss, findDesktopApp, findDebugPort, launchDesktopWithDebugging, readDesktopTheme,
+  DEFAULT_DEBUG_PORT, applyToDesktop, bundledThemeIds, clearDesktop, desktopCss, findDesktopApp, findDebugPort, readDesktopTheme, relaunchDesktopWithDebugging,
 } from "../lib/desktop.mjs";
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,17 +72,12 @@ if (has("--restart")) {
     process.exit(1);
   }
   console.log(`\nrestarting ${app.exe} with --remote-debugging-port=${port} ...`);
-  launchDesktopWithDebugging({ port, kill: true });
-  let ready = null;
-  for (let attempt = 0; attempt < 30 && !ready; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    ready = await findDebugPort([port]);
-  }
-  if (!ready) {
-    console.error("the app did not expose a debug port - start it manually with the flag and retry");
+  const relaunch = await relaunchDesktopWithDebugging({ port });
+  if (!relaunch.ok) {
+    console.error(`  ${relaunch.error}`);
     process.exit(1);
   }
-  console.log(`  port open, ${ready.targets.length} page target(s)`);
+  console.log(`  port open, ${relaunch.pages} page target(s)`);
 }
 
 let css = "";

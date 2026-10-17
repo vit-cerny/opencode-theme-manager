@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  CSS_KEYS, THEME_ID_KEY, applyToDesktop, bundledThemeIds, cdpEvaluate, clearDesktop, desktopCss, findDesktopApp, findDebugPort, probeTarget, readDesktopTheme,
+  CSS_KEYS, DEFAULT_DEBUG_PORT, THEME_ID_KEY, applyToDesktop, bundledThemeIds, cdpEvaluate, clearDesktop, desktopCss, findDesktopApp, findDebugPort, probeTarget, readDesktopTheme,
 } from "../lib/desktop.mjs";
 
 // The desktop GUI cannot be driven from files, so the mechanism under test is the one it exposes:
@@ -111,15 +111,18 @@ test("generated CSS drives the desktop app's own variable names", () => {
     "background.feedback.success.base": "#12271a", "background.feedback.warning.base": "#2b2313",
     "background.feedback.error.base": "#2c1618", "background.feedback.info.base": "#141d2e",
   };
-  const css = desktopCss(resolved, { monoFont: "JetBrains Mono", radius: 14, lineHeight: 1.5, blur: 20, customCss: "/* user block */" });
-  for (const variable of ["--v2-text-text-base", "--v2-icon-icon-base", "--v2-border-border-base", "--v2-state-fg-danger", "--background-base", "--border-radius"]) {
+  const css = desktopCss(resolved, { monoFont: "JetBrains Mono", radius: 14, blur: 20, customCss: "/* user block */" });
+  // Names read live off the running app (oc://renderer/index.html) - if the app renames one, this fails.
+  for (const variable of ["--background-base", "--surface-base", "--surface-raised-base", "--text-base", "--text-weak", "--icon-base", "--border-base", "--success-bg", "--error-text", "--border-radius"]) {
     assert.ok(css.includes(variable), `css sets ${variable}`);
   }
-  assert.match(css, /--v2-text-text-base: #e6ecf7 !important;/);
-  assert.match(css, /--v2-font-family-code: "JetBrains Mono", ui-monospace, monospace !important;/);
+  assert.match(css, /--background-base: #10162380 !important;/);
+  assert.match(css, /--surface-raised-stronger: #232c3e !important;/);
   assert.match(css, /--border-radius: 14px !important;/);
+  assert.match(css, /--v2-font-family-code: "JetBrains Mono", ui-monospace, monospace !important;/);
   assert.match(css, /backdrop-filter: blur\(20px\)/);
   assert.ok(css.includes("/* user block */"), "custom css is appended last");
+  assert.equal(desktopCss(resolved, {}).includes("--v2-font-family-code: var(--v2-font-family-code);"), true, "no font requested keeps the app's own font");
 });
 
 test("CDP round-trip: refuses a foreign page, then injects into the app page", async (t) => {
@@ -162,6 +165,30 @@ test("a themed page on a foreign origin is not treated as the app", async (t) =>
   const foreign = await probeTarget(target.ws, "https://tailwindcss.com/docs/installation");
   assert.equal(local.isApp, true, "loopback page with data-theme is an app surface");
   assert.equal(foreign.isApp, false, "the same page fetched from a remote origin would be refused");
+});
+
+test("the desktop app's real surface variables are what we write", async (t) => {
+  // Read-only against the live app when it is running with a debug port: proves the names in
+  // lib/schema.mjs#desktopClientCss are the ones the app actually defines.
+  const found = await findDebugPort([DEFAULT_DEBUG_PORT]);
+  if (!found) {
+    t.skip("desktop app is not listening on 9222 (start it with tools/desktop-apply.mjs --glass --restart)");
+    return;
+  }
+  const target = found.targets.find((candidate) => candidate.url.startsWith("oc:")) || found.targets[0];
+  const names = await cdpEvaluate(target.ws, `(() => {
+    const out = new Set();
+    for (const sheet of document.styleSheets) {
+      let rules = []; try { rules = sheet.cssRules || []; } catch { continue; }
+      for (const rule of rules) if (rule.style) for (const prop of rule.style) if (prop.startsWith("--")) out.add(prop);
+    }
+    return JSON.stringify([...out]);
+  })()`);
+  const defined = new Set(JSON.parse(names));
+  const required = ["--background-base", "--surface-base", "--surface-raised-base", "--text-base", "--text-weak", "--icon-base", "--border-base", "--border-radius", "--success-bg", "--error-text"];
+  const missing = required.filter((name) => !defined.has(name));
+  assert.deepEqual(missing, [], `the app no longer defines: ${missing.join(", ")}`);
+  t.diagnostic(`${defined.size} variables defined by the app; all ${required.length} names we write exist (${target.url})`);
 });
 
 test("a closed debug port fails with an actionable message", async () => {

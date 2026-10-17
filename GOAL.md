@@ -109,6 +109,29 @@ objective: "how do i use it, make easy deployment and uninstall, put it on githu
 
 Known residual risk (documented, not hidden): a *local* page (loopback/file/app scheme) that happens to set `data-theme` could still be mistaken for the app if it also sits behind the probed DevTools port. The port default is 9222, the port our own launcher opens.
 
+## Phase 6: the GUI actually changing (the real fix)
+
+objective: "opencode desktop app is still the same" after running `tools/desktop-apply.mjs --glass --restart`
+
+Two independent causes, both found from evidence rather than guessed:
+
+| Cause | Evidence | Fix |
+|---|---|---|
+| The debug port never opened, so nothing could be injected | Their run printed `the app did not expose a debug port`; `Get-CimInstance` showed the running app had **no** `--remote-debugging-port` in its command line, and the bundle contains `a.isPackaged \\|\\| a.commandLine.appendSwitch('remote-debugging-port', process.env.OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT ?? '9222')` plus a `second-instance` handler + `requestSingleInstanceLock` | kill -> **wait until the process is gone** -> spawn with the switch -> poll the port; `relaunchDesktopWithDebugging()` returns `{ok:true,port:9222,pages:1}` |
+| Even with a port, every injection was refused | CDP showed the app's page is `oc://renderer/index.html`; `looksLikeAppUrl()` allowed only file/app/chrome-extension/loopback, so `isApp` was false | `oc:` added to the allowed schemes (the browser stand-in page in `test/ui.test.mjs` still exercises it) |
+| The CSS targeted guessed names | Read the live stylesheet: 540 custom properties, backgrounds are `--background-base` / `--surface-*` (my generated `--v2-*` surface names do not exist) | `desktopClientCss()` rewritten onto the real names, and a test re-reads them from the running app so a rename fails loudly |
+
+Live proof (no reload, `Page` untouched between reads):
+
+```
+BEFORE {"background":"#151222","surface":"#242130","text":"#ffffff","border":"#53515c","radius":"8px","codeFont":"\"IBM Plex Mono\"..."}
+AFTER  {"background":"#2e34408c","surface":"#3a404c8c","text":"#d8dee9","border":"#3d495b","radius":"16px","codeFont":"\"JetBrains Mono\"..."}
+CHANGED: background, surface, raised, text, border, radius      injected: 2406 bytes
+```
+
+Screenshot of the themed window: `docs/desktop-app-after.png`. Tests: `node --test test/` -> 63 tests,
+62 pass, 1 skipped (the UI stand-in for the app is skipped while the real app holds port 9222).
+
 status: done
 
 

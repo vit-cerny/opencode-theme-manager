@@ -117,10 +117,40 @@ Driving `localStorage` needs a DevTools port, so the app has to be started once 
 
 ```powershell
 node tools/desktop-apply.mjs --list                # is the app installed, which themes ship, is a port open
-node tools/desktop-apply.mjs --glass --restart     # restart with DevTools + inject the glass CSS
-node tools/desktop-apply.mjs --theme-id nord       # just switch the GUI to a bundled theme
+node tools/desktop-apply.mjs --glass --restart     # restart with DevTools + inject the glass CSS (live)
+node tools/desktop-apply.mjs --theme-id nord       # switch the GUI to a bundled theme
 node tools/desktop-apply.mjs --clear               # back to the app's own settings
 ```
+
+**Why the restart is fiddly, and what the tool does about it.** The app is a packaged Electron build:
+its own bundle only adds the debug switch for dev builds
+(`app.isPackaged || app.commandLine.appendSwitch('remote-debugging-port', …)`), and it holds a
+single-instance lock that makes a second launch forward to the existing window and quit. So the tool
+kills it, **waits until the process is really gone**, then starts it with the switch and polls the
+port. Verified: `{"ok":true,"port":9222,"pages":1}`.
+
+**How it is verified, not assumed.** The app's renderer is `oc://renderer/index.html` (its own
+scheme - an earlier build of this tool refused it as "not the app", which is why nothing changed).
+Read over CDP before and after a live injection with no reload:
+
+| Variable | Before (synthwave84) | After (glass) |
+|---|---|---|
+| `--background-base` | `#151222` | `#2e34408c` |
+| `--surface-base` / `--surface-raised-base` | `#242130` / `#1e1b2a` | `#3a404c8c` |
+| `--text-base` | `#ffffff` | `#d8dee9` |
+| `--border-base` | `#53515c` | `#3d495b` |
+| `--border-radius` | `8px` | `16px` |
+| `--v2-font-family-code` | `"IBM Plex Mono"` | `"JetBrains Mono"` |
+
+The names written are the ones the app itself defines (540 custom properties were read out of its
+stylesheet): `--background-base/-weak/-strong/-stronger`, `--surface-*`, `--text-*`, `--icon-*`,
+`--border-*`, `--success/info/warning/error-*`, `--border-radius`. `test/desktop.test.mjs` re-checks
+every one of those names against the running app, so a rename fails the suite instead of silently
+doing nothing. `docs/desktop-app-after.png` is a screenshot of the themed window.
+
+Because the CSS is also stored in `localStorage`, the look survives later starts **without** the
+debug port; the port is only needed when you want to push a *new* look.
+
 
 In the manager UI the same thing lives under **7 · Desktop app (GUI)**: it lists the bundled themes,
 injects the CSS built from your current palette and fonts, and can restart the app for you.

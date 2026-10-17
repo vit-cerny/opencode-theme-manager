@@ -18,9 +18,11 @@ const chrome = [
   "/usr/bin/google-chrome",
   "/usr/bin/chromium",
 ].filter(Boolean).find((file) => fs.existsSync(file));
-// 9222 on purpose: that is the port the manager probes (`DEFAULT_DEBUG_PORT`), so the UI's own
-// discovery finds this browser exactly the way it finds the relaunched desktop app.
-const DEBUG_PORT = 9222;
+// 9222 by default: that is the port the manager probes (`DEFAULT_DEBUG_PORT`), so the UI's own
+// discovery finds this browser the way it finds the relaunched desktop app. If the real app already
+// holds 9222 we move to a random port and skip the desktop-live assertion instead of failing.
+const DESKTOP_PORT = 9222;
+let DEBUG_PORT = DESKTOP_PORT;
 let portFree = true;
 
 let server = null;
@@ -60,7 +62,8 @@ before(async () => {
     server.on("exit", (code) => reject(new Error(`server exited ${code}: ${buffer}`)));
   });
   if (!chrome) return;
-  portFree = !(await findDebugPort([DEBUG_PORT]));
+  portFree = !(await findDebugPort([DESKTOP_PORT]));
+  if (!portFree) DEBUG_PORT = 9440 + (process.pid % 40);
   chromium = spawn(chrome, ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${path.join(profile, "chrome")}`, `--remote-debugging-port=${DEBUG_PORT}`, `http://127.0.0.1:${port}/`], { stdio: "ignore" });
   for (let attempt = 0; attempt < 40; attempt++) {
     const targets = await findDebugPort([DEBUG_PORT]);
@@ -145,7 +148,7 @@ test("typing a prompt and pressing the button restyles the live preview", async 
 
 test("the desktop button applies CSS live to the app page (no reload)", async (t) => {
   if (!chrome) return t.skip("no Chromium binary available");
-  if (!portFree) return t.skip("port 9222 was already taken, so the manager would target another app");
+  if (!portFree) return t.skip("the real desktop app holds port 9222, so this browser cannot stand in for it");
   // Make this page look like the opencode app: its preload sets data-theme on <html>.
   await cdpEvaluate(page, 'document.documentElement.setAttribute("data-theme", "oc-2")');
   await cdpEvaluate(page, 'document.getElementById("desktopInfo").textContent = ""');
