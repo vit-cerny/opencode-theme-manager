@@ -87,7 +87,7 @@ let wallpaper = null;
 if (has("--wallpaper")) {
   // The app's window is opaque, so the desktop can only be seen behind the panels if the wallpaper is
   // painted into the page. tools/wallpaper.ps1 reads the real one and shrinks it to a data URL.
-  const shot = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "wallpaper.ps1"), "-Json"], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  const shot = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "wallpaper.ps1"), "-Json"], { windowsHide: true, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   try {
     const parsed = JSON.parse((shot.stdout || "").trim() || "{}");
     if (parsed.ok) {
@@ -138,7 +138,7 @@ if (backdrop) {
     process.exit(1);
   }
   console.log(`\napplying window backdrop: ${backdrop}`);
-  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "desktop-backdrop.ps1"), "-Backdrop", backdrop], { encoding: "utf8" });
+  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(repo, "tools", "desktop-backdrop.ps1"), "-Backdrop", backdrop], { windowsHide: true, encoding: "utf8" });
   console.log((result.stdout || "").trim() || (result.stderr || "").trim());
   console.log("\nread the pixel line: if 'spread' does not change between before and after, the OS");
   console.log("blur is not reaching this window (its client area paints opaquely) - see the notes in");

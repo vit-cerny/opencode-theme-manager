@@ -140,6 +140,25 @@ node tools\desktop-apply.mjs --glass --wallpaper --backdrop acrylic --restart
 
 or in the UI: **7 · Desktop app (GUI)** → tick *paint my desktop wallpaper behind the panels* → Apply.
 
+## No stray console windows
+
+Every process this project starts is launched with `windowsHide: true` — `test/spawn.test.mjs` fails the
+suite if a new spawn site forgets it. That matters because Windows shows a console for any console child
+of a console-less parent, and on this machine console apps are delegated to Windows Terminal, so each
+one appears as a **WT window titled with the command line** (which is what a pile of `rtk.exe` windows
+looks like).
+
+`tools/console-probe.ps1` answers "who is opening these windows?" without guessing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\console-probe.ps1                  # list them now
+powershell -ExecutionPolicy Bypass -File .\tools\console-probe.ps1 -Watch 60 -Out log.txt   # run hidden, log arrivals
+powershell -ExecutionPolicy Bypass -File .\tools\find-spawner.ps1 -Name rtk.exe -Seconds 45 # who is the parent
+```
+
+`-Watch` writes each new visible console window with its owning process. Run it in the background, then
+do whatever triggers the windows; the log names the culprit instead of you guessing.
+
 ## Transparency: what each client can really do
 
 | Client | Wallpaper see-through | Why |

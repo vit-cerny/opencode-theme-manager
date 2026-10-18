@@ -50,14 +50,14 @@ function waitFor(pattern, stream, timeoutMs = 20_000) {
 
 before(async () => {
   profile = fs.mkdtempSync(path.join(os.tmpdir(), "octm-desktop-"));
-  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config")], { cwd: repo });
+  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config")], { windowsHide: true, cwd: repo });
   const [, port] = await waitFor(/http:\/\/127\.0\.0\.1:(\d+)\//, server.stdout);
   base = `http://127.0.0.1:${port}/`;
   if (!chrome) return;
   chromium = spawn(chrome, [
     "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
     `--user-data-dir=${path.join(profile, "chrome")}`, `--remote-debugging-port=${DEBUG_PORT}`, base,
-  ], { stdio: "ignore" });
+  ], { windowsHide: true, stdio: "ignore" });
   for (let attempt = 0; attempt < 30; attempt++) {
     const found = await findDebugPort([DEBUG_PORT]);
     if (found?.targets.some((target) => target.url.startsWith(base))) return;
@@ -67,14 +67,14 @@ before(async () => {
 
 after(() => {
   if (chromium?.pid) {
-    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     else chromium.kill("SIGKILL");
   }
   // Also reap any Chromium left behind by an earlier run of this test (matched by our temp profile
   // path only - never the user's browser).
   if (process.platform === "win32") {
     spawnSync("powershell", ["-NoProfile", "-Command",
-      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-desktop-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-desktop-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { windowsHide: true, stdio: "ignore" });
   }
   server?.kill();
   if (profile && fs.existsSync(profile)) {
@@ -219,12 +219,12 @@ test("the desktop patcher edits 25 bytes in place and reverts byte-identically",
     const hash = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
     const original = hash(copy);
 
-    const dry = spawnSync(process.execPath, [script, "--target", copy], { encoding: "utf8" });
+    const dry = spawnSync(process.execPath, [script, "--target", copy], { windowsHide: true, encoding: "utf8" });
     assert.equal(hash(copy), original, "dry run must not write");
     assert.match(dry.stdout, /DRY RUN/);
     assert.match(dry.stdout, /transparent:!0,/);
 
-    const applied = spawnSync(process.execPath, [script, "--target", copy, "--apply"], { encoding: "utf8" });
+    const applied = spawnSync(process.execPath, [script, "--target", copy, "--apply"], { windowsHide: true, encoding: "utf8" });
     assert.equal(applied.status, 0, applied.stdout + applied.stderr);
     assert.equal(fs.statSync(copy).size, fs.statSync(app.asar).size, "size unchanged (payload-only edit)");
     const patched = fs.readFileSync(copy);
@@ -232,7 +232,7 @@ test("the desktop patcher edits 25 bytes in place and reverts byte-identically",
     assert.equal(patched.includes("backgroundColor:Ld??cn(),"), false, "anchor replaced");
     assert.deepEqual(patched.slice(0, 16), fs.readFileSync(app.asar).slice(0, 16), "archive header untouched");
 
-    const reverted = spawnSync(process.execPath, [script, "--target", copy, "--revert"], { encoding: "utf8" });
+    const reverted = spawnSync(process.execPath, [script, "--target", copy, "--revert"], { windowsHide: true, encoding: "utf8" });
     assert.equal(reverted.status, 0, reverted.stdout + reverted.stderr);
     assert.equal(hash(copy), original, "revert is byte-identical");
     t.diagnostic(`patched and reverted ${(fs.statSync(copy).size / 1024 / 1024).toFixed(0)} MB archive on a copy; the installed app was never touched`);

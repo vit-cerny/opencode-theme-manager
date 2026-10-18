@@ -460,7 +460,7 @@ const routes = {
     if (process.platform !== "win32") return { ok: false, error: "wallpaper reading is Windows-only so far" };
     const script = path.join(here, "tools", "wallpaper.ps1");
     if (!fs.existsSync(script)) return { ok: false, error: "tools/wallpaper.ps1 is missing" };
-    const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Json"], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+    const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Json"], { windowsHide: true, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
     try {
       const parsed = JSON.parse((result.stdout || "").trim() || "{}");
       return parsed.ok ? parsed : { ok: false, error: parsed.error || "no wallpaper" };
@@ -587,7 +587,7 @@ server.listen(PORT, "127.0.0.1", () => {
   if (openBrowser) {
     const command = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
     try {
-      spawn(command[0], command[1], { detached: true, stdio: "ignore" }).unref();
+      spawn(command[0], command[1], { windowsHide: true, detached: true, stdio: "ignore" }).unref();
     } catch { /* opening the browser is a convenience, never fatal */ }
   }
 });

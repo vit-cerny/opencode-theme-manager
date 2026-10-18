@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open"], { cwd: repo });
+const child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open"], { windowsHide: true, cwd: repo });
 let failures = 0;
 const check = (ok, text) => {
   if (!ok) failures++;

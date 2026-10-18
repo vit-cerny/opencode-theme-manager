@@ -46,7 +46,7 @@ const waitFor = (target, expression, timeoutMs = 20_000) => new Promise((resolve
 
 before(async () => {
   profile = fs.mkdtempSync(path.join(os.tmpdir(), "octm-ui-"));
-  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config"), "--desktop-profile", path.join(profile, "appdata")], { cwd: repo });
+  server = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", "--config-dir", path.join(profile, "config"), "--desktop-profile", path.join(profile, "appdata")], { windowsHide: true, cwd: repo });
   const port = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("server did not start")), 15_000);
     let buffer = "";
@@ -64,7 +64,7 @@ before(async () => {
   if (!chrome) return;
   portFree = !(await findDebugPort([DESKTOP_PORT]));
   if (!portFree) DEBUG_PORT = 9440 + (process.pid % 40);
-  chromium = spawn(chrome, ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${path.join(profile, "chrome")}`, `--remote-debugging-port=${DEBUG_PORT}`, `http://127.0.0.1:${port}/`], { stdio: "ignore" });
+  chromium = spawn(chrome, ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${path.join(profile, "chrome")}`, `--remote-debugging-port=${DEBUG_PORT}`, `http://127.0.0.1:${port}/`], { windowsHide: true, stdio: "ignore" });
   for (let attempt = 0; attempt < 40; attempt++) {
     const targets = await findDebugPort([DEBUG_PORT]);
     const target = targets?.targets.find((candidate) => candidate.url.startsWith("http://127.0.0.1:"));
@@ -82,12 +82,12 @@ before(async () => {
 
 after(() => {
   if (chromium?.pid) {
-    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { stdio: "ignore" });
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(chromium.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     else chromium.kill("SIGKILL");
   }
   if (process.platform === "win32") {
     spawnSync("powershell", ["-NoProfile", "-Command",
-      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-ui-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore" });
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*octm-ui-*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { windowsHide: true, stdio: "ignore" });
   }
   server?.kill();
   if (profile && fs.existsSync(profile)) {

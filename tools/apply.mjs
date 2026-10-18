@@ -48,7 +48,7 @@ if (!validation.ok) {
 }
 console.log(`theme: ${name} (${validation.ok ? "valid V2" : "invalid"}), ${Object.values(theme[mode]?.hue || {}).length} hue slots, ${mode} mode\n`);
 
-const child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", ...(configFlag ? ["--config-dir", configFlag] : [])], { cwd: repo });
+const child = spawn(process.execPath, ["server.mjs", "--port", "0", "--no-open", ...(configFlag ? ["--config-dir", configFlag] : [])], { windowsHide: true, cwd: repo });
 const port = await new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error("server did not start")), 15_000);
   let buffer = "";

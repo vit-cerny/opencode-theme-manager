@@ -19,7 +19,7 @@ const stateFile = path.join(os.tmpdir(), `octm-tile-state-${process.pid}.json`);
 const padding = 12;
 
 const runTile = (args) => {
-  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, ...args], { encoding: "utf8" });
+  const result = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, ...args], { windowsHide: true, encoding: "utf8" });
   assert.equal(result.status, 0, `tile.ps1 exited ${result.status}: ${result.stderr}`);
   return JSON.parse(result.stdout);
 };
@@ -38,8 +38,8 @@ test("tiler snaps windows into a grid, touches only the named process, and resto
   }
 
   const spawned = [
-    spawn("python", [fixture, "octm tile A"], { stdio: "ignore" }),
-    spawn("python", [fixture, "octm tile B"], { stdio: "ignore" }),
+    spawn("python", [fixture, "octm tile A"], { windowsHide: true, stdio: "ignore" }),
+    spawn("python", [fixture, "octm tile B"], { windowsHide: true, stdio: "ignore" }),
   ];
   try {
     let before = [];
@@ -92,7 +92,7 @@ test("tiler snaps windows into a grid, touches only the named process, and resto
   } finally {
     for (const child of spawned) {
       if (!child.pid) continue;
-      if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
       else child.kill("SIGKILL");
     }
     if (fs.existsSync(stateFile)) fs.rmSync(stateFile, { force: true });
@@ -104,7 +104,7 @@ test("tiling reflects the real opencode windows without moving anything unexpect
     t.skip("windows-only");
     return;
   }
-  const listed = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-ProcessName", "OpenCode", "-List", "-Json", "-StateFile", stateFile], { encoding: "utf8" });
+  const listed = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-ProcessName", "OpenCode", "-List", "-Json", "-StateFile", stateFile], { windowsHide: true, encoding: "utf8" });
   assert.equal(listed.status, 0, listed.stderr);
   const report = JSON.parse(listed.stdout);
   assert.equal(report.ok, true);

@@ -249,6 +249,39 @@ wallpaper CSS rules). Suite: 64 tests, 63 pass, 1 skipped (live-app test needs t
 Residual risks, stated: an app update replaces `app.asar` (re-run the tool); if the app enables Electron's
 asar-integrity validation it may refuse to start (one `--revert` fixes it).
 
+## Phase 10: "why does opencode keep opening cmd windows?"
+
+objective: the user sees console windows constantly, blamed opencode.
+
+Diagnosis, in order, each with the tool that produced it:
+
+1. Their screenshot showed a taskbar overflow full of identical entries: `C:\Users\witek\.local\bin\rtk.exe`.
+2. `rtk.exe --help`: "A high-performance CLI proxy designed to filter and summarize system outputs before
+   they reach your LLM context" - a token-saving wrapper around ls/git/read/test. Not opencode.
+3. `tools/console-probe.ps1` (new: enumerates visible console windows, resolves the owning process through
+   C# helpers because `[ref]`/`StringBuilder` inside a PowerShell delegate silently returned pid 0 for every
+   window) printed the culprit verbatim: `WindowsTerminal.exe: C:\Users\witek\.local\bin\rtk.exe`. On this
+   machine console apps are delegated to Windows Terminal (`HKCU\Console\%%Startup\DelegationTerminal =
+   {E12CFF52-...}`), so a stray console child shows up as a WT window titled with its command line.
+4. Who calls rtk: `~/.config/opencode/plugins/rtk.ts`, an opencode plugin that hooks `execute.before` for
+   bash/shell and runs `execFileSync("rtk", ["rewrite", command], { encoding: "utf8", timeout: 5000 })` -
+   no `windowsHide`, so **every shell tool call opened one window**. Nothing else on the machine references
+   rtk (profiles clean, no Run keys, no scheduled tasks).
+
+Fixes:
+
+- `~/.config/opencode/plugins/rtk.ts`: `windowsHide: true` on both `execFileSync` calls (backup kept at
+  `rtk.ts.bak.20261018-211446`). Verified live: a 40 s watcher logged nothing while three shell calls (which
+  each fire the plugin) ran, while a deliberately unhidden `rtk --version` *was* logged - so the probe sees
+  what it claims and the plugin no longer opens windows.
+- This repo: 29 spawn sites in `lib/`, `server.mjs`, `tools/` and `test/` lacked `windowsHide` too
+  (`tasklist`, `taskkill`, `powershell`, `cmd /c npx`); all now set it, the 40-iteration `tasklist` polling
+  loop in the relaunch path became a single hidden waiter, and `test/spawn.test.mjs` fails the suite if a
+  future spawn site forgets it.
+- One stale `rtk.exe` WT window was closed (matched by window title only, never the user's real shells).
+
+Suite: 66 tests, 65 pass, 1 skipped.
+
 status: done
 
 

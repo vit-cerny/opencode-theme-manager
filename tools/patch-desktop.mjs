@@ -106,12 +106,10 @@ if (!has("--apply")) {
 if (process.platform === "win32" && !isCopy) {
   const name = path.basename(app.exe || "OpenCode.exe");
   console.log(`\nclosing ${name} (a running app holds the file open) ...`);
-  spawnSync("taskkill", ["/IM", name, "/T", "/F"], { stdio: "ignore" });
-  for (let attempt = 0; attempt < 40; attempt++) {
-    const listing = spawnSync("tasklist", ["/FI", `IMAGENAME eq ${name}`, "/NH"], { encoding: "utf8" }).stdout || "";
-    if (!listing.toLowerCase().includes(name.toLowerCase())) break;
-    spawnSync("powershell", ["-NoProfile", "-Command", "Start-Sleep -Milliseconds 250"], { stdio: "ignore" });
-  }
+  spawnSync("taskkill", ["/IM", name, "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+  // One hidden waiter instead of 40 hidden spawns (each was a PowerShell process).
+  const wait = `$deadline = (Get-Date).AddMilliseconds(15000); while ((Get-Process -Name '${name.replace(/\.[^.]+$/, "")}' -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }`;
+  spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", wait], { windowsHide: true, stdio: "ignore", timeout: 20_000 });
 }
 
 if (!fs.existsSync(backup)) fs.copyFileSync(target, backup);
